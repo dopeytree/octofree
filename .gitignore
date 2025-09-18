@@ -1,0 +1,5 @@
+venv/
+*.pyc
+__pycache__/
+last_sent_session.txt
+.env
