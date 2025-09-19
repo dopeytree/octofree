@@ -19,14 +19,16 @@ def fetch_page_content(url):
         return None
 
 def extract_next_session(html_content):
-    # Extract text between "Next" and "Next"
-    match = re.search(r'Next\s+Session:\s*(.*?)\s*Next', html_content, re.IGNORECASE | re.DOTALL)
+    # Try to extract the session info after 'Next Session:'
+    match = re.search(r'Next\s+Session:\s*([^<\n]+)', html_content, re.IGNORECASE)
     if match:
-        session_raw = match.group(2).strip()
-        # Remove any HTML tags from the session string
+        session_raw = match.group(1).strip()
+        # Remove any HTML tags from the session string (defensive)
         session_clean = re.sub(r'<[^>]+>', '', session_raw)
         return session_clean
-    return None
+    else:
+        print("No session text found after 'Next Session:'. Regex did not match.")
+        return None
 
 def get_last_sent_session():
     if os.path.exists(LAST_SENT_FILE):
@@ -40,8 +42,9 @@ def update_last_sent_session(session_str):
 
 def send_discord_notification(message):
     data = {
-        "content": f"Free Electricity Session Alert: {message}",
-        "username": "Free Electricity Alert"
+        "content": f"🕰️ {message}",
+        "username": "🐙 Octopus - Free Electric!!! ⚡️"
+
     }
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
@@ -52,15 +55,19 @@ def send_discord_notification(message):
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
-    single_run = os.getenv('SINGLE_RUN') == '1'
+    single_run = os.getenv('SINGLE_RUN', '').lower() == 'true'
 
     html_content = fetch_page_content(url)
+    test_mode = os.getenv('TEST_MODE', '').lower() == 'true'
     if html_content:
         session_str = extract_next_session(html_content)
         if session_str:
             print(f"Found session: {session_str}")
             last_sent = get_last_sent_session()
-            if session_str != last_sent:
+            if test_mode:
+                print("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
+                send_discord_notification(session_str)
+            elif session_str != last_sent:
                 send_discord_notification(session_str)
                 update_last_sent_session(session_str)
             else:
