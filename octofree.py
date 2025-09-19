@@ -55,10 +55,10 @@ def send_discord_notification(message):
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
-    single_run = os.getenv('SINGLE_RUN', '').lower() == 'true'
+    single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
 
     html_content = fetch_page_content(url)
-    test_mode = os.getenv('TEST_MODE', '').lower() == 'true'
+    test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
     if html_content:
         session_str = extract_next_session(html_content)
         if session_str:
