@@ -1,13 +1,35 @@
+
 import requests
 import re
 import os
 import time
+from dotenv import load_dotenv
+import logging
 
-# Discord webhook URL - replace with your own
-DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1418296940847956070/yg7EVh3Mjur4lGmgms-oxqE1Q1qPLE8KGvXyHURbzdP_e2d5r04uoN0dv803ex6CfvlB'
+
+# Load environment variables from .env file in project root or octofree folder
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), 'settings.env'))
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+
+# Discord webhook URL from environment
+DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
+
+
+# Set up logging to file and console in octofree/output/
+output_dir = os.path.join(os.path.dirname(__file__), 'output')
+os.makedirs(output_dir, exist_ok=True)
+log_file = os.path.join(output_dir, 'octofree.log')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s: %(message)s',
+    handlers=[
+        logging.FileHandler(log_file),
+        logging.StreamHandler()
+    ]
+)
 
 # File to track the last sent session
-LAST_SENT_FILE = 'last_sent_session.txt'
+LAST_SENT_FILE = os.path.join(output_dir, 'last_sent_session.txt')
 
 def fetch_page_content(url):
     try:
@@ -15,7 +37,7 @@ def fetch_page_content(url):
         response.raise_for_status()
         return response.text
     except Exception as e:
-        print(f"Error fetching page: {e}")
+        logging.error(f"Error fetching page: {e}")
         return None
 
 def extract_next_session(html_content):
@@ -27,7 +49,7 @@ def extract_next_session(html_content):
         session_clean = re.sub(r'<[^>]+>', '', session_raw)
         return session_clean
     else:
-        print("No session text found after 'Next Session:'. Regex did not match.")
+        logging.warning("No session text found after 'Next Session:'. Regex did not match.")
         return None
 
 def get_last_sent_session():
@@ -41,17 +63,19 @@ def update_last_sent_session(session_str):
         f.write(session_str)
 
 def send_discord_notification(message):
+    if not DISCORD_WEBHOOK_URL:
+        logging.error("ERROR: DISCORD_WEBHOOK_URL environment variable must be set.")
+        return
     data = {
         "content": f"🕰️ {message}",
         "username": "🐙 Octopus - Free Electric!!! ⚡️"
-
     }
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
         response.raise_for_status()
-        print("Notification sent successfully.")
+        logging.info("Notification sent successfully.")
     except Exception as e:
-        print(f"Error sending notification: {e}")
+        logging.error(f"Error sending notification: {e}")
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
@@ -62,20 +86,20 @@ def main():
     if html_content:
         session_str = extract_next_session(html_content)
         if session_str:
-            print(f"Found session: {session_str}")
+            logging.info(f"Found session: {session_str}")
             last_sent = get_last_sent_session()
             if test_mode:
-                print("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
+                logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
                 send_discord_notification(session_str)
             elif session_str != last_sent:
                 send_discord_notification(session_str)
                 update_last_sent_session(session_str)
             else:
-                print("Already sent notification for this session.")
+                logging.info("Already sent notification for this session.")
         else:
-            print("No session text found between 'Next' and 'Next'.")
+            logging.warning("No session text found between 'Next' and 'Next'.")
     else:
-        print("Failed to fetch page content.")
+        logging.error("Failed to fetch page content.")
 
     # Exit if SINGLE_RUN is set, otherwise loop every hour
     if not single_run:
