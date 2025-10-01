@@ -15,8 +15,16 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Upgrade pip to patch vulnerabilities
 RUN pip install --upgrade pip
 
-# Copy your script(s)
+# Copy your script(s) and template
 COPY . .
+
+# Set up configuration from template if no settings.env exists
+RUN if [ ! -f settings.env ]; then cp settings.env.template settings.env; fi
+
+# Environment variables can be passed during docker run
+ENV DISCORD_WEBHOOK_URL=""
+ENV SINGLE_RUN="false"
+ENV TEST_MODE="false"
 
 # Run your main script
 CMD ["python3", "octofree.py"]
