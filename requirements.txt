@@ -1,4 +1,8 @@
+# Pinned dependencies for octofree Docker builds.
+# Keep this in sync with the repository's top-level `requirements.txt`.
+# If you prefer a single canonical file, either update the Dockerfile to
+# COPY ../requirements.txt or remove this file and reference the top-level one.
 
-requests
-python-dateutil
-python-dotenv
+requests==2.32.5
+python-dateutil==2.9.0.post0
+python-dotenv==1.1.1
