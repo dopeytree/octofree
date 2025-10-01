@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Update Docker base images
+  - package-ecosystem: "docker"
+    directory: "/octofree"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+
+  # Update Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/octofree"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
