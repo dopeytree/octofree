@@ -15,7 +15,14 @@ DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
 
 # Set up logging to file and console in octofree/output/
-output_dir = os.path.join(os.path.dirname(__file__), 'output')
+# Allow overriding the output directory via environment (useful for Docker bind-mounts)
+# If OUTPUT_DIR is not set, default to the repository's ./output folder to preserve
+# existing behavior when running locally.
+DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'output')
+output_dir = os.getenv('OUTPUT_DIR', DEFAULT_OUTPUT_DIR)
+
+# Expand user (~) and resolve relative paths to absolute paths
+output_dir = os.path.abspath(os.path.expanduser(output_dir))
 os.makedirs(output_dir, exist_ok=True)
 log_file = os.path.join(output_dir, 'octofree.log')
 logging.basicConfig(
@@ -39,7 +46,8 @@ def _log_loaded_settings():
         logging.info(f"DISCORD_WEBHOOK_URL={discord}")
         logging.info(f"TEST_MODE={test_mode}")
         logging.info(f"SINGLE_RUN={single_run}")
-    # Rely on the configured logging handlers to write these values to the log file/console.
+        logging.info(f"OUTPUT_DIR={output_dir}")
+        # Rely on the configured logging handlers to write these values to the log file/console.
     except Exception as e:
         logging.error(f"Failed to log loaded settings: {e}")
 

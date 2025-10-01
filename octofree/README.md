@@ -80,3 +80,28 @@ SINGLE_RUN=true
 
 - `output/last_sent_session.txt`: Tracks the last session for which a notification was sent.
 - `output/octofree.log`: Main log file for all activity and errors.
+
+### Persisting output when running in Docker
+
+By default the script writes runtime files to the `output/` folder inside the project. When running inside Docker you should bind-mount a host folder so logs and state persist across container restarts. There are two simple options:
+
+- Set the `OUTPUT_DIR` environment variable to a path inside the container that you've mounted from the host (recommended). For example, mount a host folder to `/data` and set `OUTPUT_DIR=/data` in `settings.env` or your container environment.
+- Alternatively, mount your host folder directly over the container's project `output/` folder.
+
+Example `docker-compose.yml` snippet (recommended - mount to `/data` and set `OUTPUT_DIR`):
+
+```yaml
+services:
+	octofree:
+		image: your-image-name:latest
+		environment:
+			- DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+			- OUTPUT_DIR=/data
+			- SINGLE_RUN=false
+			- TEST_MODE=false
+		volumes:
+			- /path/on/host/octofree-data:/data
+		restart: unless-stopped
+```
+
+When the container runs, the script will use the `OUTPUT_DIR` value to write `octofree.log` and `last_sent_session.txt` to the mounted host folder so you can inspect them on the host (Unraid) even after the container stops or is recreated.
