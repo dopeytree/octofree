@@ -27,6 +27,25 @@ logging.basicConfig(
     ]
 )
 
+# Log the loaded configuration so the Docker image (or any run) records what was used
+def _log_loaded_settings():
+    try:
+        # Read the key settings we care about
+        discord = os.getenv('DISCORD_WEBHOOK_URL')
+        test_mode = os.getenv('TEST_MODE')
+        single_run = os.getenv('SINGLE_RUN')
+
+        # Use logging.info so it goes to both console and the log file
+        logging.info(f"DISCORD_WEBHOOK_URL={discord}")
+        logging.info(f"TEST_MODE={test_mode}")
+        logging.info(f"SINGLE_RUN={single_run}")
+    # Rely on the configured logging handlers to write these values to the log file/console.
+    except Exception as e:
+        logging.error(f"Failed to log loaded settings: {e}")
+
+# Immediately log settings on module load/startup
+_log_loaded_settings()
+
 # File to track the last session(s)
 LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
 
