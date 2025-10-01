@@ -18,7 +18,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        submodules: recursive
         fetch-depth: 0
 
     - name: Log in to GitHub Container Registry
@@ -40,6 +39,7 @@ jobs:
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
+      id: build
       uses: docker/build-push-action@v5
       with:
         context: ./octofree
@@ -49,6 +49,8 @@ jobs:
         labels: ${{ steps.meta.outputs.labels }}
 
     - name: Run Trivy vulnerability scan
+      id: trivy
+      if: ${{ success() }}
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'image'
@@ -58,6 +60,6 @@ jobs:
 
     - name: Upload Trivy scan results to GitHub Security tab
       uses: github/codeql-action/upload-sarif@v3
-      if: always()
+      if: ${{ steps.trivy.outcome == 'success' }}
       with:
         sarif_file: 'trivy-results.sarif'
