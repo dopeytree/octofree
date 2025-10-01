@@ -1,4 +1,3 @@
-
 import requests
 import re
 import os
@@ -28,8 +27,8 @@ logging.basicConfig(
     ]
 )
 
-# File to track the last sent session
-LAST_SENT_FILE = os.path.join(output_dir, 'last_sent_session.txt')
+# File to track the last session(s)
+LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
 
 def fetch_page_content(url):
     try:
@@ -52,15 +51,22 @@ def extract_next_session(html_content):
         logging.warning("No session text found after 'Next Session:'. Regex did not match.")
         return None
 
+# Read the last session from the log file
+
 def get_last_sent_session():
-    if os.path.exists(LAST_SENT_FILE):
-        with open(LAST_SENT_FILE, 'r') as f:
-            return f.read().strip()
+    if os.path.exists(LAST_SESSION_LOG):
+        # Read the history file and return the most recent non-empty line
+        with open(LAST_SESSION_LOG, 'r') as f:
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+            if lines:
+                return lines[-1]
     return None
 
 def update_last_sent_session(session_str):
-    with open(LAST_SENT_FILE, 'w') as f:
-        f.write(session_str)
+    with open(LAST_SESSION_LOG, 'a') as f:
+        f.write(session_str + "\n")
+
+# Discord notification function
 
 def send_discord_notification(message):
     if not DISCORD_WEBHOOK_URL:
@@ -76,6 +82,8 @@ def send_discord_notification(message):
         logging.info("Notification sent successfully.")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
+
+# Loop settings
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
