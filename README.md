@@ -4,9 +4,9 @@ Never miss Octopus free electricity again!
 - 💰 *Saving Sessions* are frequent during *high winds* 
 - 👩‍💻 Octopus Energy send an email to the registered account holder about 48hours before
 - ❌ We then forget to act
-- ✅ Hence **octofree!**
+- ✅ Hence octofree!
 
-The script scans the website https://octopus.energy/free-electricity/ for the next seshion date & time then sends a Discord webhook notification to your server.
+The script scans the website https://octopus.energy/free-electricity/ for the next session date & time then sends a Discord webhook notification to your mobile.
 
 ## Requirements 
 
