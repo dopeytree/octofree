@@ -1,67 +1,82 @@
 # 🐙 octofree
 
 Never miss Octopus free electricity again! 
-*Saving Sessions* are frequent during high winds. Usually octopus send an email about 48hours before hand. 
-We then forget.
-Hence octofree. 
+- 💰 *Saving Sessions* are frequent during *high winds* 
+- 👩‍💻 Octopus Energy send an email to the registered account holder about 48hours before
+- ❌ We then forget to act
+- ✅ Hence **octofree!**
 
-This script scans the website https://octopus.energy/free-electricity/ for the next seshion date & time then sends a Discord webhook notification to you.
+The script scans the website https://octopus.energy/free-electricity/ for the next seshion date & time then sends a Discord webhook notification to your server.
+
+## Requirements 
+
+- octopus energy customer
+- 24/7 powered: server / pc / mac / raspberry pi / etc
+- internet access
+- python3
+- discord [server]
+- discord [mobile device] 
 
 ## Virtual Environment
 
-This project uses a Python virtual environment located in the `.venv` folder.
+Prefered method is running in a Python virtual environment located a `.venv` folder.
 
-To activate the virtual environment (macOS/Linux, zsh):
-
-```sh
-source .venv/bin/activate
-```
-
-To deactivate:
-
-```sh
-deactivate
-```
-
-If you need to create the virtual environment:
+- create the virtual environment:
 
 ```sh
 python3 -m venv .venv
 ```
 
-## Features & Configuration
+- activate the virtual environment (macOS/Linux):
+
+```sh
+source .venv/bin/activate
+```
+
+## Configuration
+
+see `settings.env`
 
 ### Discord Webhook Notification
 
-Set your Discord webhook URL in `settings.env`:
+- [required for notifications]
+- load or create a server in *discord*
+- create a new channel called 'octofree'
+- click the cogs to get the settings then find the webhooks button
+- create a new webhook & copy the url
+- set your *discord* webhook URL in `settings.env`
+  
 
 ```
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
 
-This is required for notifications.
 
 ### Test Mode
 
-Enable test mode: allows more than 1x notification per current session:
+- Allows notifcation testing
+- DEFAULT - Set to `false` to send only 1x notification per *saving sessions*
+- Set to `true` to send > than 1x notification per current session
+- `True` currently only works during an *active* session session
 
 ```
 TEST_MODE=true
+
+TEST_MODE=false
 ```
 
-Set to `false` to only notify for new sessions.
+
 
 ### Single Run
 
-Run the script once and exit (instead of looping every hour):
+- Run the script once and exit (instead of looping every hour)
+- Set to `false` for continuous hourly monitoring.
 
 ```
 SINGLE_RUN=true
 ```
 
-Set to `false` for continuous monitoring.
-
-### Output Files
+### Logs
 
 - `output/last_sent_session.txt`: Tracks the last session for which a notification was sent.
 - `output/octofree.log`: Main log file for all activity and errors.
