@@ -1,4 +1,4 @@
-FROM python:3.12-alpine
+FROM python:3.13-alpine
 
 # Auto-patch vulnerabilities in base image
 RUN apk update && apk upgrade --no-cache
