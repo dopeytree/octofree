@@ -1,55 +1,95 @@
 # 🐙 octofree
 
 Never miss Octopus free electricity again! 
-- 💰 *Saving Sessions* are frequent during *high winds* 
-- 👩‍💻 Octopus Energy send an email to the registered account holder about 48hours before
-- ❌ We then forget to act
-- ✅ Hence octofree!
+- 💰 *saving sessions* are frequent during *strong winds* 
+  - 👩‍💻 48 hours prior Octopus Energy send an email to the account holder
+  - ❌ we then forget to act, missing out on free energy
+  - ✅ hence octofree will ping your mobile!
 
-The script scans the website https://octopus.energy/free-electricity/ for the next session date & time then sends a Discord webhook notification to your mobile.
+- 🧠 the script scans https://octopus.energy/free-electricity/ 
+- 📆 for the next *saving session* date & time 
+- 📱 sends you a Discord webhook notification on your mobile
+
+![logo](https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true)
 
 ## Requirements 
 
-- octopus energy customer
-- 24/7 powered: server / pc / mac / raspberry pi / etc
+- octopus energy customer + signed up to saving sessions
+- 24/7 powered - server | pc | mac | raspberry pi | etc
 - internet access
 - python3
-- docker
-- discord [server]
+- [discord webhook](#discord-webhook-notification) [server]
 - discord [mobile device] 
 
 ## Virtual Environment
 
-Preferred method is docker but you can also run in a Python virtual environment located a `.venv` folder.
+Preferred method is [docker](#docker) but you can also run in a Python virtual environment located a `.venv` folder
 
 - create the virtual environment:
-
 ```sh
 python3 -m venv .venv
 ```
-
 - activate the virtual environment (macOS/Linux):
-
 ```sh
 source .venv/bin/activate
 ```
+- set [settings](#settings-configuration) in settings.env 
+- run the script
+```sh  
+ python3 octofree/octofree.py 
+ ```
 
-## Unraid 
+## Unraid Server
 
-- add container
+- add CONTAINER
 - repo url: 
-- ```sh 
-  ghcr.io/dopeytree/octofree:latest 
+```sh 
+ghcr.io/dopeytree/octofree:latest 
+```
+- advanced --> icon url: 
+```sh 
+https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true
+```
+#### add VARIABLE -> discord:
+- `key` = 
+```sh
+DISCORD_WEBHOOK_URL
+```
+- `value` = 
+- `enter_your_discord_server_webhook`
+
+#### add VARIABLE -> test mode:
+- `key`=
+```sh
+TEST_MODE
+```
+- `value` = 
+```sh
+false
+```
+#### add VARIABLE -> loop:
+- `key` = 
+```sh
+SINGLE_RUN
+```
+- `value` = 
+```sh
+false
   ```
-- icon : 
-- add variable:
-- add variable:
-- add variable: 
-- add path:
+#### add PATH:
+- `container path` = 
+```sh
+  /data
+```
+- `host path` = 
+```sh
+/mnt/user/appdata/octofree
+```
+#### APPLY settings
 
 ## Docker
 
-Prefer the official published image on GitHub Container Registry (recommended):
+- Official published image on GitHub Container Registry :
 
 ```sh
 docker pull ghcr.io/dopeytree/octofree:latest
@@ -64,24 +104,28 @@ docker run --rm \
   ghcr.io/dopeytree/octofree:latest
 ```
 
-Notes:
+#### Notes:
 
-- Use `--env-file ./octofree/settings.env` or set individual `-e` variables to provide your `DISCORD_WEBHOOK_URL`, `OUTPUT_DIR`, and other options. If no `settings.env` file exists in your workspace, copy or create one from `octofree/settings.env.template`.
-- Bind-mount a host folder to persist logs and state. Set `OUTPUT_DIR=/data` (or another mounted path) so the `output/` files appear on the host.
+- Use `--env-file ./octofree/settings.env` or set individual `-e` variables to provide your 
+  - `DISCORD_WEBHOOK_URL`, `OUTPUT_DIR`, and other options
+  - If no `settings.env` file exists in your workspace, copy or create one from `octofree/settings.env.template`
+- Bind-mount a host folder to persist logs and state
+  - Set `OUTPUT_DIR=/data` (or another mounted path) so the `output/` files appear on the host
 
-Quick local build (optional, light documentation):
+#### Optional quick local build:
 
 ```sh
 # Build locally (if you need to modify code or prefer a local image)
 docker build -t octofree ./octofree
-
+```
+```sh
 # Run the locally built image
 docker run --rm --env-file ./octofree/settings.env -v /path/on/host/octofree-data:/data octofree
 ```
 
 If you want the helper script and vulnerability scan, run the included `./octofree/build.sh` (it builds the image and runs a Trivy scan).
 
-Example `docker-compose.yml` (recommended for long-running deployments):
+## Example `docker-compose.yml` (recommended for long-running deployments):
 
 ```yaml
 version: '3.8'
@@ -98,7 +142,64 @@ services:
     restart: unless-stopped
 ```
 
-Tips & troubleshooting
-- If you change `settings.env` locally, avoid rebuilding by supplying `--env-file` or `-e` variables at `docker run` time.
-- Check logs and last-sent session inside the mounted folder (`octofree.log`, `last_sent_session.txt`) when debugging notifications.
-- The `build.sh` script runs Trivy; if you don't have Trivy available you can skip it and use `docker build` directly.
+### Docker Tips & troubleshooting
+- If you change `settings.env` locally, avoid rebuilding by supplying `--env-file` or `-e` variables at `docker run` time
+- Check logs and last-sent session inside the mounted folder (`octofree.log`, `last_sent_session.txt`) when debugging notifications
+- The `build.sh` script runs Trivy; if you don't have Trivy available you can skip it and use `docker build` directly
+
+## Settings Configuration
+
+see `settings.env`
+
+### Discord Webhook Notification
+
+- [required for notifications]
+- load or create a server in *discord*
+- create a new channel called 'octofree'
+- click the cogs to get the settings then find the webhooks button
+- create a new webhook & copy the url
+- set your *discord* webhook URL in `settings.env`
+
+```sh
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
+
+### Test Mode
+
+- allows multiple notifcation testing when 1x is live
+- DEFAULT=`false` to send only 1x notification per *saving sessions*
+- set to `true` to send > than 1x notification per current session
+- `true` currently only works during an *active* saving session
+
+```sh
+TEST_MODE=false
+TEST_MODE=true
+```
+
+### Single Run
+
+- to loop or not
+- true = runs the script once & exits (instead of looping every hour)
+- DEFAULT=false
+- set to `false` for continuous hourly monitoring
+
+```sh
+SINGLE_RUN=false
+SINGLE_RUN=true
+```
+
+### Storage
+
+Only required for [unraid](#unraid) & [docker](#docker)
+```sh
+volumes:
+      - /path/on/host/octofree-data:/data
+```
+
+## Logs
+
+Check your setup for the exact path to the [storage](#storage) ouput folder
+- `output/octofree.log`
+  - main log file for all activity and errors
+- `output/last_sent_session.txt`
+  - tracks the last session for which a notification was sent
