@@ -37,7 +37,10 @@ source .venv/bin/activate
 ## Unraid 
 
 - add container
-- repo url: ```sh ghcr.io/dopeytree/octofree:latest ```
+- repo url: 
+- ```sh 
+  ghcr.io/dopeytree/octofree:latest 
+  ```
 - icon : 
 - add variable:
 - add variable:
