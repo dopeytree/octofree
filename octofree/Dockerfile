@@ -10,10 +10,9 @@ RUN apk add --no-cache curl
 
 # Copy requirements first for better caching (if you have one)
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
 # Upgrade pip to patch vulnerabilities
 RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy your script(s) and template
 COPY . .
