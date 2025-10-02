@@ -14,12 +14,13 @@ The script scans the website https://octopus.energy/free-electricity/ for the ne
 - 24/7 powered: server / pc / mac / raspberry pi / etc
 - internet access
 - python3
+- docker
 - discord [server]
 - discord [mobile device] 
 
 ## Virtual Environment
 
-Prefered method is running in a Python virtual environment located a `.venv` folder.
+Preferred method is docker but you can also run in a Python virtual environment located a `.venv` folder.
 
 - create the virtual environment:
 
@@ -33,75 +34,68 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-## Configuration
+## Unraid 
 
-see `settings.env`
+- add container
+- repo url: ```sh ghcr.io/dopeytree/octofree:latest ```
+- icon : 
+- add variable:
+- add variable:
+- add variable: 
+- add path:
 
-### Discord Webhook Notification
+## Docker
 
-- [required for notifications]
-- load or create a server in *discord*
-- create a new channel called 'octofree'
-- click the cogs to get the settings then find the webhooks button
-- create a new webhook & copy the url
-- set your *discord* webhook URL in `settings.env`
-  
+Prefer the official published image on GitHub Container Registry (recommended):
 
-```
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
-```
-
-
-### Test Mode
-
-- Allows notifcation testing
-- DEFAULT - Set to `false` to send only 1x notification per *saving sessions*
-- Set to `true` to send > than 1x notification per current session
-- `True` currently only works during an *active* session session
-
-```
-TEST_MODE=true
-
-TEST_MODE=false
+```sh
+docker pull ghcr.io/dopeytree/octofree:latest
 ```
 
+Run the published image (recommended):
 
-
-### Single Run
-
-- Run the script once and exit (instead of looping every hour)
-- Set to `false` for continuous hourly monitoring.
-
-```
-SINGLE_RUN=true
+```sh
+docker run --rm \
+  --env-file ./octofree/settings.env \
+  -v /path/on/host/octofree-data:/data \
+  ghcr.io/dopeytree/octofree:latest
 ```
 
-### Logs
+Notes:
 
-- `output/last_sent_session.txt`: Tracks the last session for which a notification was sent.
-- `output/octofree.log`: Main log file for all activity and errors.
+- Use `--env-file ./octofree/settings.env` or set individual `-e` variables to provide your `DISCORD_WEBHOOK_URL`, `OUTPUT_DIR`, and other options. If no `settings.env` file exists in your workspace, copy or create one from `octofree/settings.env.template`.
+- Bind-mount a host folder to persist logs and state. Set `OUTPUT_DIR=/data` (or another mounted path) so the `output/` files appear on the host.
 
-### Persisting output when running in Docker
+Quick local build (optional, light documentation):
 
-By default the script writes runtime files to the `output/` folder inside the project. When running inside Docker you should bind-mount a host folder so logs and state persist across container restarts. There are two simple options:
+```sh
+# Build locally (if you need to modify code or prefer a local image)
+docker build -t octofree ./octofree
 
-- Set the `OUTPUT_DIR` environment variable to a path inside the container that you've mounted from the host (recommended). For example, mount a host folder to `/data` and set `OUTPUT_DIR=/data` in `settings.env` or your container environment.
-- Alternatively, mount your host folder directly over the container's project `output/` folder.
+# Run the locally built image
+docker run --rm --env-file ./octofree/settings.env -v /path/on/host/octofree-data:/data octofree
+```
 
-Example `docker-compose.yml` snippet (recommended - mount to `/data` and set `OUTPUT_DIR`):
+If you want the helper script and vulnerability scan, run the included `./octofree/build.sh` (it builds the image and runs a Trivy scan).
+
+Example `docker-compose.yml` (recommended for long-running deployments):
 
 ```yaml
+version: '3.8'
 services:
-	octofree:
-		image: your-image-name:latest
-		environment:
-			- DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
-			- OUTPUT_DIR=/data
-			- SINGLE_RUN=false
-			- TEST_MODE=false
-		volumes:
-			- /path/on/host/octofree-data:/data
-		restart: unless-stopped
+  octofree:
+    image: ghcr.io/dopeytree/octofree:latest
+    environment:
+      - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
+      - OUTPUT_DIR=/data
+      - SINGLE_RUN=false
+      - TEST_MODE=false
+    volumes:
+      - /path/on/host/octofree-data:/data
+    restart: unless-stopped
 ```
 
-When the container runs, the script will use the `OUTPUT_DIR` value to write `octofree.log` and `last_sent_session.txt` to the mounted host folder so you can inspect them on the host (Unraid) even after the container stops or is recreated.
+Tips & troubleshooting
+- If you change `settings.env` locally, avoid rebuilding by supplying `--env-file` or `-e` variables at `docker run` time.
+- Check logs and last-sent session inside the mounted folder (`octofree.log`, `last_sent_session.txt`) when debugging notifications.
+- The `build.sh` script runs Trivy; if you don't have Trivy available you can skip it and use `docker build` directly.
