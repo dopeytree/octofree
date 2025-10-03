@@ -153,6 +153,49 @@ def parse_session_to_reminder(session_str):
         return None  # Reminder time already past
     return reminder_time
 
+def parse_session_to_end_reminder(session_str):
+    """
+    Parse the session string to extract the end reminder time (2 minutes before end).
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns a datetime object for the end reminder, or None if parsing fails or time is past.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
+    
+    # Extract end time (after the dash)
+    end_time_str = time_part.split('-')[1].strip()  # e.g., '2pm'
+    match = re.match(r'(\d+)(am|pm)', end_time_str.lower())
+    if not match:
+        return None
+    hour = int(match.group(1))
+    ampm = match.group(2)
+    if ampm == 'pm' and hour != 12:
+        hour += 12
+    elif ampm == 'am' and hour == 12:
+        hour = 0
+    minute = 0  # Assume on the hour
+    
+    # Parse date with current year
+    current_year = datetime.now().year
+    date_str_full = f"{date_part} {current_year}"
+    try:
+        date_obj = datetime.strptime(date_str_full, '%A %d %B %Y')
+    except ValueError:
+        return None
+    
+    # Combine into session end datetime
+    session_end = date_obj.replace(hour=hour, minute=minute)
+    now = datetime.now()
+    if session_end <= now:
+        return None  # Session already ended or in past
+    end_reminder_time = session_end - timedelta(minutes=2)
+    if end_reminder_time <= now:
+        return None  # End reminder time already past
+    return end_reminder_time
+
 # Loop settings
 
 def main():
@@ -174,6 +217,11 @@ def main():
                 time.sleep(60)
                 logging.info("TEST_MODE: Sending reminder notification for testing.")
                 send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
+                # In test mode, wait another minute before sending the end state for testing
+                logging.info("TEST_MODE: Waiting another minute before sending end state...")
+                time.sleep(60)
+                logging.info("TEST_MODE: Sending end state notification for testing.")
+                send_discord_notification(f"🐰 End State", "end_state")
             elif session_str != last_sent:
                 send_discord_notification(f"🕰️ {session_str}", "date_time")  # Add 🕰️ only for the main notification
                 update_last_sent_session(session_str)
@@ -184,6 +232,14 @@ def main():
                     threading.Thread(target=lambda: (
                         time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
                         send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
+                    )).start()
+                # Schedule end state reminder for new session
+                end_reminder_time = parse_session_to_end_reminder(session_str)
+                if end_reminder_time:
+                    logging.info(f"End state reminder scheduled for {end_reminder_time} (2 minutes before session end).")
+                    threading.Thread(target=lambda: (
+                        time.sleep(max(0, (end_reminder_time - datetime.now()).total_seconds())),
+                        send_discord_notification(f"🐰 End State", "end_state")
                     )).start()
             else:
                 logging.info("Already sent notification for this session.")
