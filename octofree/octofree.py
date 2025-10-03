@@ -96,7 +96,7 @@ def update_last_sent_session(session_str):
         f.write(session_str + "\n")
 
 # Discord notification function
-def send_discord_notification(message):
+def send_discord_notification(message, notification_type="general"):
     if not DISCORD_WEBHOOK_URL:
         logging.error("ERROR: DISCORD_WEBHOOK_URL environment variable must be set.")
         return
@@ -106,8 +106,7 @@ def send_discord_notification(message):
     }
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
-        response.raise_for_status()
-        logging.info("Notification sent successfully.")
+        logging.info(f"{notification_type} notification sent successfully.")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
 
@@ -169,14 +168,14 @@ def main():
             last_sent = get_last_sent_session()
             if test_mode:
                 logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
-                send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
+                send_discord_notification(f"🕰️ {session_str}", "date_time")  # Add 🕰️ only for the main notification
                 # In test mode, wait 1 minute before sending the reminder for testing
                 logging.info("TEST_MODE: Waiting 1 minute before sending reminder...")
                 time.sleep(60)
                 logging.info("TEST_MODE: Sending reminder notification for testing.")
-                send_discord_notification(f"📣 T- 5mins to Delta!")
+                send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
             elif session_str != last_sent:
-                send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
+                send_discord_notification(f"🕰️ {session_str}", "date_time")  # Add 🕰️ only for the main notification
                 update_last_sent_session(session_str)
                 # Schedule reminder for new session
                 reminder_time = parse_session_to_reminder(session_str)
@@ -184,7 +183,7 @@ def main():
                     logging.info(f"Reminder scheduled for {reminder_time} (5 minutes before session start).")
                     threading.Thread(target=lambda: (
                         time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
-                        send_discord_notification(f"📣 T- 5mins to Delta!")
+                        send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
                     )).start()
             else:
                 logging.info("Already sent notification for this session.")
