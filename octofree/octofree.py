@@ -96,13 +96,12 @@ def update_last_sent_session(session_str):
         f.write(session_str + "\n")
 
 # Discord notification function
-
 def send_discord_notification(message):
     if not DISCORD_WEBHOOK_URL:
         logging.error("ERROR: DISCORD_WEBHOOK_URL environment variable must be set.")
         return
     data = {
-        "content": f"🕰️ {message}",
+        "content": message,  # Removed the automatic 🕰️ prefix
         "username": "🐙 Octopus - Free Electric!!! ⚡️"
     }
     try:
@@ -170,12 +169,12 @@ def main():
             last_sent = get_last_sent_session()
             if test_mode:
                 logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
-                send_discord_notification(session_str)
+                send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
                 # In test mode, send the reminder immediately as a one-off for quick verification
                 logging.info("TEST_MODE: Sending immediate reminder notification for testing.")
-                send_discord_notification(f"📣 T- 5mins till free electricity session starts!{session_str}")
+                send_discord_notification(f"📣 T- 5mins to Delta!")
             elif session_str != last_sent:
-                send_discord_notification(session_str)
+                send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
                 update_last_sent_session(session_str)
                 # Schedule reminder for new session
                 reminder_time = parse_session_to_reminder(session_str)
@@ -183,7 +182,7 @@ def main():
                     logging.info(f"Reminder scheduled for {reminder_time} (5 minutes before session start).")
                     threading.Thread(target=lambda: (
                         time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
-                        send_discord_notification(f" 📣 T- 5mins till free electricity session starts!{session_str}")
+                        send_discord_notification(f"📣 T- 5mins to Delta!")
                     )).start()
             else:
                 logging.info("Already sent notification for this session.")
