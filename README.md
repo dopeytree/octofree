@@ -7,8 +7,9 @@ Never miss Octopus free electricity again!
   - ✅ hence octofree will ping your mobile!
 
 - 🧠 the script scans https://octopus.energy/free-electricity/ 
-- 📆 for the next *saving session* date & time 
+- 📆 extracts the next *saving session* date & time 
 - 📱 sends you a Discord webhook notification on your mobile
+- 🚨 reminds you again 5mins before *saving session* starts
 
 ![logo](https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true)
 
@@ -28,7 +29,7 @@ Never miss Octopus free electricity again!
 ## Installation 
 
 <details>
-<summary>Virtual Environment</summary>
+<summary>- Virtual Environment</summary>
 
 ## Virtual Environment
 
@@ -50,7 +51,7 @@ source .venv/bin/activate
 </details>
 
 <details>
-<summary>Unraid Server</summary>
+<summary>- Unraid Server</summary>
 
 ## Unraid Server
 
@@ -99,11 +100,10 @@ false
 /mnt/user/appdata/octofree
 ```
 #### APPLY settings
-
 </details>
 
 <details>
-<summary>Docker</summary>
+<summary>- Docker</summary>
 
 ## Docker
 
@@ -171,6 +171,9 @@ services:
 
 see `settings.env`
 
+<details>
+<summary>- Discord Webhook Notification</summary>
+
 ### Discord Webhook Notification
 
 - [required for notifications]
@@ -183,6 +186,10 @@ see `settings.env`
 ```sh
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 ```
+</details>
+
+<details>
+<summary>- Test Mode</summary>
 
 ### Test Mode
 
@@ -195,6 +202,10 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 TEST_MODE=false
 TEST_MODE=true
 ```
+</details>
+
+<details>
+<summary>- Single Run</summary>
 
 ### Single Run
 
@@ -207,6 +218,10 @@ TEST_MODE=true
 SINGLE_RUN=false
 SINGLE_RUN=true
 ```
+</details>
+
+<details>
+<summary>- Storage</summary>
 
 ### Storage
 
@@ -215,6 +230,7 @@ Only required for [unraid](#unraid) & [docker](#docker)
 volumes:
       - /path/on/host/octofree-data:/data
 ```
+</details>
 
 ## Logs
 
