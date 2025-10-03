@@ -26,15 +26,15 @@
 
 - octopus energy customer + signed up to saving sessions
 - 24/7 powered - server | pc | mac | raspberry pi | etc
-- internet access
-- python3
-- [discord webhook](#discord-webhook-notification) [server]
+  - internet access
+  - python3
+  - [discord webhook](#discord-webhook-notification) [server]
 - discord [mobile device] 
 
 ## Installation 
 
 <details>
-<summary>- Virtual Environment</summary>
+<summary> Virtual Environment</summary>
 
 ## Virtual Environment
 
@@ -56,7 +56,7 @@ source .venv/bin/activate
 </details>
 
 <details>
-<summary>- Unraid Server</summary>
+<summary> Unraid Server</summary>
 
 ## Unraid Server
 
@@ -108,7 +108,7 @@ false
 </details>
 
 <details>
-<summary>- Docker</summary>
+<summary> Docker</summary>
 
 ## Docker
 
@@ -177,7 +177,7 @@ services:
 see `settings.env`
 
 <details>
-<summary>- Discord Webhook Notification</summary>
+<summary> Discord Webhook Notification</summary>
 
 ### Discord Webhook Notification
 
@@ -194,7 +194,7 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 </details>
 
 <details>
-<summary>- Test Mode</summary>
+<summary> Test Mode</summary>
 
 ### Test Mode
 
@@ -202,6 +202,8 @@ DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
 - DEFAULT=`false` to send only 1x notification per *saving sessions*
 - set to `true` to send > than 1x notification per current session
 - `true` currently only works during an *active* saving session
+- `true` sends time date, then 1min sends 5min delta, then end state
+- `true` allows testing of discord on mobile etc
 
 ```sh
 TEST_MODE=false
@@ -210,7 +212,7 @@ TEST_MODE=true
 </details>
 
 <details>
-<summary>- Single Run</summary>
+<summary> Single Run</summary>
 
 ### Single Run
 
@@ -226,7 +228,7 @@ SINGLE_RUN=true
 </details>
 
 <details>
-<summary>- Storage</summary>
+<summary> Storage</summary>
 
 ### Storage
 
@@ -239,7 +241,8 @@ volumes:
 
 ## Logs
 
-Check your setup for the exact path to the [storage](#storage) ouput folder
+See console for octofree.log
+- Check your setup for the exact path to the [storage](#storage) ouput folder
 - `output/octofree.log`
   - main log file for all activity and errors
 - `output/last_sent_session.txt`
