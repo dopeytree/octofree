@@ -12,7 +12,9 @@ Never miss Octopus free electricity again!
 
 ![logo](https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true)
 
+## Screenshot
 
+![screenshot](https://github.com/dopeytree/octofree/blob/30b013c68437122c40854ba1d52ec4a67115318f/screenshot.png?raw=true)
 
 ## Requirements 
 
