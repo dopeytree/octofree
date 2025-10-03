@@ -1,15 +1,20 @@
-# 🐙 octofree
+# 🐙 octofree - Is here to serve
+- 🐙 Octopus - Free Electric!!! ⚡APP — 16:53
+  - 🕰️ 12-2pm, Saturday 4th October
+  - 📣 T- 5mins to Delta!
+  - 🐰 End State 
 
-Never miss Octopus free electricity again! 
-- 💰 *saving sessions* are frequent during *strong winds* 
+## Never miss Octopus free electricity again! 
+- 💰 *saving sessions* are free electric periods (usually 1-2hrs) frequent during *strong winds* 
   - 👩‍💻 48 hours prior Octopus Energy send an email to the account holder
   - ❌ we then forget to act, missing out on free energy
   - ✅ hence octofree will ping your mobile!
 
 - 🧠 the script scans https://octopus.energy/free-electricity/ 
-- 📆 extracts the next *saving session* date & time 
-- 📱 sends you a Discord webhook notification on your mobile
-- 🚨 reminds you again 5mins before *saving session* starts
+  - 📆 extracts the next *saving session* date & time 
+  - 📱 sends you a [discord webhook](#discord-webhook-notification) notification on your mobile
+  - 📣 reminds you again 5mins before *saving session* starts
+  - 🐰 warns 3mins before the end state
 
 ![logo](https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true)
 
