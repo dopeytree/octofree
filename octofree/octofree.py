@@ -67,8 +67,8 @@ def fetch_page_content(url):
         return None
 
 def extract_next_session(html_content):
-    # Try to extract the session info after 'Next Session:'
-    match = re.search(r'Next\s+Session:\s*([^<\n]+)', html_content, re.IGNORECASE)
+    # Try to extract the session info after 'Next Session:' (now includes optional words like 'TWO HOUR')
+    match = re.search(r'Next(?:\s+\w+)*\s+Session:\s*([^<\n]+)', html_content, re.IGNORECASE)
     if match:
         session_raw = match.group(1).strip()
         # Remove any HTML tags from the session string (defensive)
