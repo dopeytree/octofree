@@ -12,6 +12,8 @@ Never miss Octopus free electricity again!
 
 ![logo](https://github.com/dopeytree/octofree/blob/61e16adea141812f674ca91d86ab697ac02e0c91/logo_octofree.png?raw=true)
 
+
+
 ## Requirements 
 
 - octopus energy customer + signed up to saving sessions
@@ -20,6 +22,11 @@ Never miss Octopus free electricity again!
 - python3
 - [discord webhook](#discord-webhook-notification) [server]
 - discord [mobile device] 
+
+## Installation 
+
+<details>
+<summary>Virtual Environment</summary>
 
 ## Virtual Environment
 
@@ -38,6 +45,10 @@ source .venv/bin/activate
 ```sh  
  python3 octofree/octofree.py 
  ```
+</details>
+
+<details>
+<summary>Unraid Server</summary>
 
 ## Unraid Server
 
@@ -86,6 +97,11 @@ false
 /mnt/user/appdata/octofree
 ```
 #### APPLY settings
+
+</details>
+
+<details>
+<summary>Docker</summary>
 
 ## Docker
 
@@ -147,7 +163,9 @@ services:
 - Check logs and last-sent session inside the mounted folder (`octofree.log`, `last_sent_session.txt`) when debugging notifications
 - The `build.sh` script runs Trivy; if you don't have Trivy available you can skip it and use `docker build` directly
 
-## Settings Configuration
+</details>
+
+## Settings
 
 see `settings.env`
 
