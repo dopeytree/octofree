@@ -92,6 +92,13 @@ def get_last_sent_session():
     return None
 
 def update_last_sent_session(session_str):
+    # Ensure the file ends with a newline before appending to prevent concatenation
+    if os.path.exists(LAST_SESSION_LOG):
+        with open(LAST_SESSION_LOG, 'r') as f:
+            content = f.read()
+            if content and not content.endswith('\n'):
+                with open(LAST_SESSION_LOG, 'a') as f:
+                    f.write('\n')
     with open(LAST_SESSION_LOG, 'a') as f:
         f.write(session_str + "\n")
 
