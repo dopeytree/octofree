@@ -174,6 +174,7 @@ def main():
                 # Schedule reminder even in test mode
                 reminder_time = parse_session_to_reminder(session_str)
                 if reminder_time:
+                    logging.info(f"Reminder scheduled for {reminder_time} (5 minutes before session start).")
                     threading.Thread(target=lambda: (
                         time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
                         send_discord_notification(f"📣 T- 5mins till free electricity session starts!{session_str}")
@@ -184,6 +185,7 @@ def main():
                 # Schedule reminder for new session
                 reminder_time = parse_session_to_reminder(session_str)
                 if reminder_time:
+                    logging.info(f"Reminder scheduled for {reminder_time} (5 minutes before session start).")
                     threading.Thread(target=lambda: (
                         time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
                         send_discord_notification(f" 📣 T- 5mins till free electricity session starts!{session_str}")
