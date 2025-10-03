@@ -170,8 +170,10 @@ def main():
             if test_mode:
                 logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
                 send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
-                # In test mode, send the reminder immediately as a one-off for quick verification
-                logging.info("TEST_MODE: Sending immediate reminder notification for testing.")
+                # In test mode, wait 1 minute before sending the reminder for testing
+                logging.info("TEST_MODE: Waiting 1 minute before sending reminder...")
+                time.sleep(60)
+                logging.info("TEST_MODE: Sending reminder notification for testing.")
                 send_discord_notification(f"📣 T- 5mins to Delta!")
             elif session_str != last_sent:
                 send_discord_notification(f"🕰️ {session_str}")  # Add 🕰️ only for the main notification
