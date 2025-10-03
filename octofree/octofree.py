@@ -2,6 +2,8 @@ import requests
 import re
 import os
 import time
+from datetime import datetime, timedelta
+import threading
 from dotenv import load_dotenv
 import logging
 
@@ -110,6 +112,49 @@ def send_discord_notification(message):
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
 
+def parse_session_to_reminder(session_str):
+    """
+    Parse the session string to extract the reminder time (5 minutes before start).
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns a datetime object for the reminder, or None if parsing fails or time is past.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
+    
+    # Extract start time (before the dash)
+    start_time_str = time_part.split('-')[0].strip()  # e.g., '12pm'
+    match = re.match(r'(\d+)(am|pm)', start_time_str.lower())
+    if not match:
+        return None
+    hour = int(match.group(1))
+    ampm = match.group(2)
+    if ampm == 'pm' and hour != 12:
+        hour += 12
+    elif ampm == 'am' and hour == 12:
+        hour = 0
+    minute = 0  # Assume on the hour
+    
+    # Parse date with current year
+    current_year = datetime.now().year
+    date_str_full = f"{date_part} {current_year}"
+    try:
+        date_obj = datetime.strptime(date_str_full, '%A %d %B %Y')
+    except ValueError:
+        return None
+    
+    # Combine into session start datetime
+    session_start = date_obj.replace(hour=hour, minute=minute)
+    now = datetime.now()
+    if session_start <= now:
+        return None  # Session already started or in past
+    reminder_time = session_start - timedelta(minutes=5)
+    if reminder_time <= now:
+        return None  # Reminder time already past
+    return reminder_time
+
 # Loop settings
 
 def main():
@@ -126,9 +171,23 @@ def main():
             if test_mode:
                 logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
                 send_discord_notification(session_str)
+                # Schedule reminder even in test mode
+                reminder_time = parse_session_to_reminder(session_str)
+                if reminder_time:
+                    threading.Thread(target=lambda: (
+                        time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
+                        send_discord_notification(f"📣 T- 5mins till free electricity session starts!{session_str}")
+                    )).start()
             elif session_str != last_sent:
                 send_discord_notification(session_str)
                 update_last_sent_session(session_str)
+                # Schedule reminder for new session
+                reminder_time = parse_session_to_reminder(session_str)
+                if reminder_time:
+                    threading.Thread(target=lambda: (
+                        time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
+                        send_discord_notification(f" 📣 T- 5mins till free electricity session starts!{session_str}")
+                    )).start()
             else:
                 logging.info("Already sent notification for this session.")
         else:
