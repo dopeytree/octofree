@@ -388,6 +388,22 @@ def main():
             stored_sessions = load_scheduled_sessions()
             stored_session_strs = {s['session'] for s in stored_sessions}
             
+            # Validate and re-parse times for existing sessions if invalid
+            for session in stored_sessions:
+                try:
+                    if session.get('reminder_time'):
+                        datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
+                except ValueError:
+                    reminder_time = parse_session_to_reminder(session['session'])
+                    session['reminder_time'] = reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if reminder_time else None
+                try:
+                    if session.get('end_reminder_time'):
+                        datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
+                except ValueError:
+                    end_reminder_time = parse_session_to_end_reminder(session['session'])
+                    session['end_reminder_time'] = end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if end_reminder_time else None
+            save_scheduled_sessions(stored_sessions)
+            
             new_sessions_added = False
             for session_str in current_sessions:
                 if session_str not in stored_session_strs:
