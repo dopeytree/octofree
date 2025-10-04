@@ -211,7 +211,7 @@ def parse_session_to_reminder(session_str):
 
 def parse_session_to_end_reminder(session_str):
     """
-    Parse the session string to extract the end reminder time (2 minutes before end).
+    Parse the session string to extract the end reminder time (5 minutes before end).
     Assumes format like '12-2pm, Saturday 4th October'.
     Returns a datetime object for the end reminder, or None if parsing fails or time is past.
     """
@@ -246,7 +246,14 @@ def parse_session_to_end_reminder(session_str):
         return None
     
     # Combine into session end datetime
-    return date_obj.replace(hour=hour, minute=minute)
+    session_end = date_obj.replace(hour=hour, minute=minute)
+    now = datetime.now()
+    if session_end <= now:
+        return None
+    end_reminder_time = session_end - timedelta(minutes=5)
+    if end_reminder_time <= now:
+        return None
+    return end_reminder_time
 
 def parse_session_end_date(session_str):
     """
@@ -459,20 +466,47 @@ def main():
             stored_sessions = load_scheduled_sessions()
             stored_session_strs = {s['session'] for s in stored_sessions}
             
-            # Validate and re-parse times for existing sessions if invalid
+            # Validate and re-parse times for existing sessions if invalid, and add missing start_time/end_time/reminder_times
+            now = datetime.now()
             for session in stored_sessions:
-                try:
-                    if session.get('reminder_time'):
-                        datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
-                except ValueError:
-                    reminder_time = parse_session_to_reminder(session['session'])
-                    session['reminder_time'] = reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if reminder_time else None
-                try:
-                    if session.get('end_reminder_time'):
-                        datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
-                except ValueError:
-                    end_reminder_time = parse_session_to_end_reminder(session['session'])
-                    session['end_reminder_time'] = end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if end_reminder_time else None
+                session_str = session['session']
+                start_time = None
+                end_time = None
+                if session.get('start_time'):
+                    try:
+                        start_time = datetime.strptime(session['start_time'], '%Y-%m-%dT%H:%M:%S')
+                    except ValueError:
+                        pass
+                if session.get('end_time'):
+                    try:
+                        end_time = datetime.strptime(session['end_time'], '%Y-%m-%dT%H:%M:%S')
+                    except ValueError:
+                        pass
+                if not start_time:
+                    start_time = parse_session_date(session_str)
+                    if start_time:
+                        session['start_time'] = start_time.strftime('%Y-%m-%dT%H:%M:%S')
+                if not end_time:
+                    end_time = parse_session_end_date(session_str)
+                    if end_time:
+                        session['end_time'] = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+        
+                # Calculate reminder_time as start_time - 5 mins if not present or invalid
+                if start_time and (not session.get('reminder_time') or session['reminder_time'] is None):
+                    reminder_time = start_time - timedelta(minutes=5)
+                    if reminder_time > now:
+                        session['reminder_time'] = reminder_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    else:
+                        session['reminder_time'] = None
+        
+                # Calculate end_reminder_time as end_time - 5 mins if not present or invalid
+                if end_time and (not session.get('end_reminder_time') or session['end_reminder_time'] is None):
+                    end_reminder_time = end_time - timedelta(minutes=5)
+                    if end_reminder_time > now:
+                        session['end_reminder_time'] = end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S')
+                    else:
+                        session['end_reminder_time'] = None
+    
             save_scheduled_sessions(stored_sessions)
             
             new_sessions_added = False
@@ -535,14 +569,29 @@ def main():
             past_sessions = load_past_scheduled_sessions()
             sessions_to_remove = []
             for session in stored_sessions:
-                if session.get('end_reminder_time'):
+                if session.get('end_time'):
                     try:
-                        end_reminder_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
-                        if end_reminder_dt < now:
+                        end_dt = datetime.strptime(session['end_time'], '%Y-%m-%dT%H:%M:%S')
+                        if end_dt < now:
+                            # Fill in any null reminder times for complete history
+                            if not session.get('reminder_time') and session.get('start_time'):
+                                try:
+                                    start_dt = datetime.strptime(session['start_time'], '%Y-%m-%dT%H:%M:%S')
+                                    reminder_time = start_dt - timedelta(minutes=5)
+                                    session['reminder_time'] = reminder_time.strftime('%Y-%m-%dT%H:%M:%S')
+                                except ValueError:
+                                    pass
+                            if not session.get('end_reminder_time') and session.get('end_time'):
+                                try:
+                                    end_dt_parsed = datetime.strptime(session['end_time'], '%Y-%m-%dT%H:%M:%S')
+                                    end_reminder_time = end_dt_parsed - timedelta(minutes=5)
+                                    session['end_reminder_time'] = end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S')
+                                except ValueError:
+                                    pass
                             past_sessions.append(session)
                             sessions_to_remove.append(session)
                     except ValueError:
-                        logging.warning(f"Invalid end_reminder_time for session {session['session']}, skipping move to past.")
+                        logging.warning(f"Invalid end_time for session {session['session']}, skipping move to past.")
             for session in sessions_to_remove:
                 stored_sessions.remove(session)
             save_past_scheduled_sessions(past_sessions)
