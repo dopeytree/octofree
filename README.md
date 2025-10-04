@@ -1,5 +1,5 @@
-# 🐙 octofree - Is here to serve
-- 🐙 Octopus - Free Electric!!! ⚡APP — 16:53
+# Octofree - is here to serve
+- 🐙 Octopus - Free Electric!!! ⚡APP — 10:45
   - 🕰️ 12-2pm, Saturday 4th October
   - 📣 T- 5mins to Delta!
   - 🐰 End State 
