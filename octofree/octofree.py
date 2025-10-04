@@ -83,16 +83,67 @@ def get_last_sent_session():
                 return lines[-1]
     return None
 
+def parse_session_date(session_str):
+    """
+    Parse the session string to extract a datetime for sorting.
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns a datetime object, or None if parsing fails.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
+    
+    # Remove ordinal suffix from date
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    
+    # Extract start time (before the dash)
+    start_time_str = time_part.split('-')[0].strip()  # e.g., '12'
+    match = re.match(r'(\d+)(am|pm)?', start_time_str.lower())
+    if not match:
+        return None
+    hour = int(match.group(1))
+    ampm = match.group(2) or ('pm' if hour == 12 else 'am')
+    if ampm == 'pm' and hour != 12:
+        hour += 12
+    elif ampm == 'am' and hour == 12:
+        hour = 0
+    minute = 0  # Assume on the hour
+    
+    # Parse date with current year
+    current_year = datetime.now().year
+    date_str_full = f"{date_part} {current_year}"
+    try:
+        date_obj = datetime.strptime(date_str_full, '%A %d %B %Y')
+    except ValueError:
+        return None
+    
+    # Combine into session start datetime
+    return date_obj.replace(hour=hour, minute=minute)
+
 def update_last_sent_session(session_str):
-    # Ensure the file ends with a newline before appending to prevent concatenation
+    # Load existing sessions
+    sessions = []
     if os.path.exists(LAST_SESSION_LOG):
         with open(LAST_SESSION_LOG, 'r') as f:
-            content = f.read()
-            if content and not content.endswith('\n'):
-                with open(LAST_SESSION_LOG, 'a') as f:
-                    f.write('\n')
-    with open(LAST_SESSION_LOG, 'a') as f:
-        f.write(session_str + "\n")
+            sessions = [line.strip() for line in f.readlines() if line.strip()]
+    
+    # Add new session if not already present
+    if session_str not in sessions:
+        sessions.append(session_str)
+    
+    # Sort by parsed date (newest first), ignoring unparseable ones
+    def sort_key(s):
+        dt = parse_session_date(s)
+        return dt if dt else datetime.min  # Unparseable go to the end
+    
+    sessions.sort(key=sort_key, reverse=True)
+    
+    # Rewrite the file
+    with open(LAST_SESSION_LOG, 'w') as f:
+        for session in sessions:
+            f.write(session + '\n')
 
 # Discord notification function
 def send_discord_notification(message, notification_type="general"):
@@ -105,7 +156,7 @@ def send_discord_notification(message, notification_type="general"):
     }
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
-        logging.info(f"{notification_type} notification sent successfully.")
+        logging.info(f"{notification_type} notification sent successfully: {message}")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
 
@@ -203,8 +254,13 @@ def parse_session_to_end_reminder(session_str):
 
 def load_scheduled_sessions():
     if os.path.exists(SCHEDULED_SESSIONS_FILE):
-        with open(SCHEDULED_SESSIONS_FILE, 'r') as f:
-            return json.load(f)
+        try:
+            with open(SCHEDULED_SESSIONS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            # If file is empty or invalid, return empty list
+            logging.warning(f"Invalid or empty JSON in {SCHEDULED_SESSIONS_FILE}. Treating as empty.")
+            return []
     return []
 
 def save_scheduled_sessions(sessions):
@@ -214,58 +270,88 @@ def save_scheduled_sessions(sessions):
 def extract_sessions(html_content):
     sessions = []
     # Try to find "Next Sessions:" first (for multiple)
-    match = re.search(r'Next\s+Sessions:', html_content, re.IGNORECASE)
+    match = re.search(r'Next\s+Sessions?:', html_content, re.IGNORECASE)
     if match:
         start_pos = match.end()
         # Find the end of this section (next heading or double newline or end)
-        end_match = re.search(r'<h\d>', html_content[start_pos:], re.IGNORECASE)
+        end_match = re.search(r'<h\d[^>]*>', html_content[start_pos:], re.IGNORECASE)
         end_pos = end_match.start() if end_match else len(html_content) - start_pos
         block = html_content[start_pos:start_pos + end_pos]
+        # Replace <br> with \n to handle line breaks
+        block = re.sub(r'<br\s*/?>', '\n', block, re.IGNORECASE)
         # Remove HTML tags
         text_block = re.sub(r'<[^>]+>', '', block).strip()
-        # Split into lines (handling potential extra whitespace)
-        lines = [line.strip() for line in re.split(r'\s*\n\s*', text_block) if line.strip()]
-        for line in lines:
-            # Validate as a session (improved check: time-time, comma, date with ordinal)
-            if re.match(r'\d+(am|pm)?-\d+(am|pm)?,.*\d+(st|nd|rd|th)', line, re.IGNORECASE):
-                sessions.append(line)
+        # Split by newlines or common separators to avoid concatenation
+        potential_sessions = re.split(r'\n|Next|Power Tower', text_block)
+        for part in potential_sessions:
+            part = part.strip()
+            if part:
+                # Use regex findall to extract valid session strings from each part
+                found = re.findall(r'\d+(?:am|pm)?-\d+(?:am|pm)?,\s*\w+\s*\d+(?:st|nd|rd|th)?\s*\w+', part, re.IGNORECASE)
+                sessions.extend(found)
     else:
-        # Fallback to old single session logic (updated to handle plural if needed)
+        # Fallback to old single session logic
         match = re.search(r'Next(?:\s+\w+)*\s+Sessions?:\s*([^<\n]+)', html_content, re.IGNORECASE)
         if match:
             session_raw = match.group(1).strip()
             session_clean = re.sub(r'<[^>]+>', '', session_raw)
-            sessions.append(session_clean)
+            # Split if multiple are concatenated
+            found = re.findall(r'\d+(?:am|pm)?-\d+(?:am|pm)?,\s*\w+\s*\d+(?:st|nd|rd|th)?\s*\w+', session_clean, re.IGNORECASE)
+            sessions.extend(found)
+    # Remove duplicates and clean
+    sessions = list(set(sessions))
     return sessions
 
 # Loop settings
 
+active_timers = []  # Global list to keep references to active timers
+
+import threading
+
+# Lock for thread-safe JSON access
+json_lock = threading.Lock()
+
+def schedule_notifications(session, sessions_list):
+    """Schedule timers for a session's notifications."""
+    session_str = session['session']
+    
+    # Initial notification
+    if not session['notified']:
+        timer = threading.Timer(0, lambda: send_and_update(session, sessions_list, 'notified', f"🕰️ {session_str}", "date_time"))
+        timer.start()
+        active_timers.append(timer)
+    
+    # Reminder notification
+    if session.get('reminder_time') and not session['reminder_sent']:
+        reminder_dt = datetime.fromisoformat(session['reminder_time'])
+        delay = (reminder_dt - datetime.now()).total_seconds()
+        if delay > 0:
+            timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'reminder_sent', f"📣 T-5mins to Delta!", "5min_delta"))
+            timer.start()
+            active_timers.append(timer)
+    
+    # End notification
+    if session.get('end_reminder_time') and not session['end_sent']:
+        end_dt = datetime.fromisoformat(session['end_reminder_time'])
+        delay = (end_dt - datetime.now()).total_seconds()
+        if delay > 0:
+            timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'end_sent', f"🐰 End State", "end_state"))
+            timer.start()
+            active_timers.append(timer)
+
+def send_and_update(session, sessions_list, flag_key, message, notification_type):
+    """Send notification and update/save the session flag."""
+    send_discord_notification(message, notification_type)
+    session[flag_key] = True
+    with json_lock:
+        save_scheduled_sessions(sessions_list)
+
 def check_and_send_notifications():
-    """Check for due notifications and send them."""
-    now = datetime.now()
+    """Load sessions and schedule pending notifications."""
     sessions = load_scheduled_sessions()
-    updated = False
     for session in sessions:
-        session_str = session['session']
-        if not session['notified']:
-            # Send initial notification if not done
-            send_discord_notification(f"🕰️ {session_str}", "date_time")
-            session['notified'] = True
-            updated = True
-        reminder_time_str = session.get('reminder_time')
-        reminder_time = datetime.fromisoformat(reminder_time_str) if reminder_time_str else None
-        if reminder_time and not session['reminder_sent'] and now >= reminder_time:
-            send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
-            session['reminder_sent'] = True
-            updated = True
-        end_reminder_time_str = session.get('end_reminder_time')
-        end_reminder_time = datetime.fromisoformat(end_reminder_time_str) if end_reminder_time_str else None
-        if end_reminder_time and not session['end_sent'] and now >= end_reminder_time:
-            send_discord_notification(f"🐰 End State", "end_state")
-            session['end_sent'] = True
-            updated = True
-    if updated:
-        save_scheduled_sessions(sessions)
+        schedule_notifications(session, sessions)
+    # No need to save here, as timers handle it
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
@@ -301,7 +387,7 @@ def main():
                     }
                     stored_sessions.append(new_session)
                     logging.info(f"New session added: {session_str}")
-            
+                    update_last_sent_session(session_str)  # Update the log file for each new session
             save_scheduled_sessions(stored_sessions)
             # Remove past sessions (optional: clean up old ones)
             now = datetime.now()
