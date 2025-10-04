@@ -323,7 +323,14 @@ def schedule_notifications(session, sessions_list):
     
     # Reminder notification
     if session.get('reminder_time') and not session['reminder_sent']:
-        reminder_dt = datetime.fromisoformat(session['reminder_time'])
+        try:
+            reminder_dt = datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
+        except ValueError:
+            try:
+                reminder_dt = datetime.strptime(session['reminder_time'], '%y-%m-%dT%H:%M:%S')
+            except ValueError:
+                logging.error(f"Invalid reminder_time format for session {session_str}: {session['reminder_time']}")
+                return
         delay = (reminder_dt - datetime.now()).total_seconds()
         if delay > 0:
             timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'reminder_sent', f"📣 T-5mins to Delta!", "5min_delta"))
@@ -332,7 +339,14 @@ def schedule_notifications(session, sessions_list):
     
     # End notification
     if session.get('end_reminder_time') and not session['end_sent']:
-        end_dt = datetime.fromisoformat(session['end_reminder_time'])
+        try:
+            end_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
+        except ValueError:
+            try:
+                end_dt = datetime.strptime(session['end_reminder_time'], '%y-%m-%dT%H:%M:%S')
+            except ValueError:
+                logging.error(f"Invalid end_reminder_time format for session {session_str}: {session['end_reminder_time']}")
+                return
         delay = (end_dt - datetime.now()).total_seconds()
         if delay > 0:
             timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'end_sent', f"🐰 End State", "end_state"))
@@ -368,10 +382,13 @@ def main():
     while True:
         html_content = fetch_page_content(url)
         if html_content:
+            logging.debug(f"Fetched HTML content length: {len(html_content)}")  # Debug log for fetch success
             current_sessions = extract_sessions(html_content)
+            logging.debug(f"Extracted sessions: {current_sessions}")  # Debug log for extraction results
             stored_sessions = load_scheduled_sessions()
             stored_session_strs = {s['session'] for s in stored_sessions}
             
+            new_sessions_added = False
             for session_str in current_sessions:
                 if session_str not in stored_session_strs:
                     # New session: parse times and add to tracking
@@ -382,17 +399,52 @@ def main():
                         'notified': False,
                         'reminder_sent': False,
                         'end_sent': False,
-                        'reminder_time': reminder_time.isoformat() if reminder_time else None,
-                        'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None
+                        'reminder_time': reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if reminder_time else None,
+                        'end_reminder_time': end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if end_reminder_time else None
                     }
                     stored_sessions.append(new_session)
                     logging.info(f"New session added: {session_str}")
                     update_last_sent_session(session_str)  # Update the log file for each new session
+                    new_sessions_added = True
             save_scheduled_sessions(stored_sessions)
+            
+            # Log status if no new sessions but existing ones are monitored
+            if not new_sessions_added and stored_sessions:
+                logging.info("No new sessions detected, but existing sessions are being monitored.")
+            
+            # Log notification statuses for all stored sessions
+            for session in stored_sessions:
+                session_str = session['session']
+                reminder_time_str = "not scheduled"
+                end_time_str = "not scheduled"
+                if session.get('reminder_time'):
+                    try:
+                        reminder_dt = datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
+                    except ValueError:
+                        try:
+                            reminder_dt = datetime.strptime(session['reminder_time'], '%y-%m-%dT%H:%M:%S')
+                        except ValueError:
+                            reminder_time_str = "invalid format"
+                            continue
+                    reminder_time_str = reminder_dt.strftime('%Y-%m-%d %H:%M:%S')
+                if session.get('end_reminder_time'):
+                    try:
+                        end_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
+                    except ValueError:
+                        try:
+                            end_dt = datetime.strptime(session['end_reminder_time'], '%y-%m-%dT%H:%M:%S')
+                        except ValueError:
+                            end_time_str = "invalid format"
+                            continue
+                    end_time_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
+                logging.info(f"Session '{session_str}': Delta notification scheduled for {reminder_time_str}, end state notification scheduled for {end_time_str}")
+            
             # Remove past sessions (optional: clean up old ones)
             now = datetime.now()
-            stored_sessions = [s for s in stored_sessions if not (s.get('end_reminder_time') and datetime.fromisoformat(s['end_reminder_time']) < now)]
+            stored_sessions = [s for s in stored_sessions if not (s.get('end_reminder_time') and datetime.strptime(s['end_reminder_time'], '%Y-%m-%dT%H:%M:%S') < now)]
             save_scheduled_sessions(stored_sessions)
+        else:
+            logging.error("Failed to fetch HTML content.")  # Explicit error if fetch fails
         
         if single_run:
             break
