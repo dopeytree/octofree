@@ -311,47 +311,41 @@ import threading
 # Lock for thread-safe JSON access
 json_lock = threading.Lock()
 
-def schedule_notifications(session, sessions_list):
-    """Schedule timers for a session's notifications."""
-    session_str = session['session']
-    
-    # Initial notification
-    if not session['notified']:
-        timer = threading.Timer(0, lambda: send_and_update(session, sessions_list, 'notified', f"🕰️ {session_str}", "date_time"))
-        timer.start()
-        active_timers.append(timer)
-    
-    # Reminder notification
-    if session.get('reminder_time') and not session['reminder_sent']:
-        try:
-            reminder_dt = datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
-        except ValueError:
+def check_and_send_notifications():
+    """Check and send pending notifications based on current time."""
+    sessions = load_scheduled_sessions()
+    now = datetime.now()
+    for session in sessions:
+        # Initial notification
+        if not session['notified']:
+            send_and_update(session, sessions, 'notified', f"🕰️ {session['session']}", "date_time")
+        
+        # Reminder notification
+        if session.get('reminder_time') and not session['reminder_sent']:
             try:
-                reminder_dt = datetime.strptime(session['reminder_time'], '%y-%m-%dT%H:%M:%S')
+                reminder_dt = datetime.strptime(session['reminder_time'], '%Y-%m-%dT%H:%M:%S')
             except ValueError:
-                logging.error(f"Invalid reminder_time format for session {session_str}: {session['reminder_time']}")
-                return
-        delay = (reminder_dt - datetime.now()).total_seconds()
-        if delay > 0:
-            timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'reminder_sent', f"📣 T-5mins to Delta!", "5min_delta"))
-            timer.start()
-            active_timers.append(timer)
-    
-    # End notification
-    if session.get('end_reminder_time') and not session['end_sent']:
-        try:
-            end_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
-        except ValueError:
+                try:
+                    reminder_dt = datetime.strptime(session['reminder_time'], '%y-%m-%dT%H:%M:%S')
+                except ValueError:
+                    logging.error(f"Invalid reminder_time format for session {session['session']}: {session['reminder_time']}")
+                    continue
+            if now >= reminder_dt:
+                send_and_update(session, sessions, 'reminder_sent', f"📣 T-5mins to Delta!", "5min_delta")
+        
+        # End notification
+        if session.get('end_reminder_time') and not session['end_sent']:
             try:
-                end_dt = datetime.strptime(session['end_reminder_time'], '%y-%m-%dT%H:%M:%S')
+                end_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
             except ValueError:
-                logging.error(f"Invalid end_reminder_time format for session {session_str}: {session['end_reminder_time']}")
-                return
-        delay = (end_dt - datetime.now()).total_seconds()
-        if delay > 0:
-            timer = threading.Timer(delay, lambda: send_and_update(session, sessions_list, 'end_sent', f"🐰 End State", "end_state"))
-            timer.start()
-            active_timers.append(timer)
+                try:
+                    end_dt = datetime.strptime(session['end_reminder_time'], '%y-%m-%dT%H:%M:%S')
+                except ValueError:
+                    logging.error(f"Invalid end_reminder_time format for session {session['session']}: {session['end_reminder_time']}")
+                    continue
+            if now >= end_dt and now - end_dt <= timedelta(minutes=5):
+                # Send only if within 5 minutes
+                send_and_update(session, sessions, 'end_sent', f"🐰 End State", "end_state")
 
 def send_and_update(session, sessions_list, flag_key, message, notification_type):
     """Send notification and update/save the session flag."""
@@ -360,24 +354,10 @@ def send_and_update(session, sessions_list, flag_key, message, notification_type
     with json_lock:
         save_scheduled_sessions(sessions_list)
 
-def check_and_send_notifications():
-    """Load sessions and schedule pending notifications."""
-    sessions = load_scheduled_sessions()
-    for session in sessions:
-        schedule_notifications(session, sessions)
-    # No need to save here, as timers handle it
-
 def main():
     url = 'https://octopus.energy/free-electricity/'
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
-
-    # Start a thread for checking notifications every minute
-    def notification_loop():
-        while True:
-            check_and_send_notifications()
-            time.sleep(60)
-    threading.Thread(target=notification_loop, daemon=True).start()
 
     while True:
         html_content = fetch_page_content(url)
