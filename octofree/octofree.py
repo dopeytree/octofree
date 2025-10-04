@@ -4,6 +4,7 @@ import os
 import time
 from datetime import datetime, timedelta
 import threading
+import json  # Added for JSON handling
 from dotenv import load_dotenv
 import logging
 
@@ -59,6 +60,9 @@ _log_loaded_settings()
 # File to track the last session(s)
 LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
 
+# New file for tracking scheduled sessions
+SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'scheduled_sessions.json')
+
 def fetch_page_content(url):
     try:
         response = requests.get(url)
@@ -66,18 +70,6 @@ def fetch_page_content(url):
         return response.text
     except Exception as e:
         logging.error(f"Error fetching page: {e}")
-        return None
-
-def extract_next_session(html_content):
-    # Try to extract the session info after 'Next Session:' (now includes optional words like 'TWO HOUR')
-    match = re.search(r'Next(?:\s+\w+)*\s+Session:\s*([^<\n]+)', html_content, re.IGNORECASE)
-    if match:
-        session_raw = match.group(1).strip()
-        # Remove any HTML tags from the session string (defensive)
-        session_clean = re.sub(r'<[^>]+>', '', session_raw)
-        return session_clean
-    else:
-        logging.warning("No session text found after 'Next Session:'. Regex did not match.")
         return None
 
 # Read the last session from the log file
@@ -129,13 +121,16 @@ def parse_session_to_reminder(session_str):
     time_part = parts[0].strip()  # e.g., '12-2pm'
     date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
     
+    # Remove ordinal suffix from date
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    
     # Extract start time (before the dash)
-    start_time_str = time_part.split('-')[0].strip()  # e.g., '12pm'
-    match = re.match(r'(\d+)(am|pm)', start_time_str.lower())
+    start_time_str = time_part.split('-')[0].strip()  # e.g., '12'
+    match = re.match(r'(\d+)(am|pm)?', start_time_str.lower())
     if not match:
         return None
     hour = int(match.group(1))
-    ampm = match.group(2)
+    ampm = match.group(2) or ('pm' if hour == 12 else 'am')
     if ampm == 'pm' and hour != 12:
         hour += 12
     elif ampm == 'am' and hour == 12:
@@ -172,13 +167,16 @@ def parse_session_to_end_reminder(session_str):
     time_part = parts[0].strip()  # e.g., '12-2pm'
     date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
     
+    # Remove ordinal suffix from date
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    
     # Extract end time (after the dash)
     end_time_str = time_part.split('-')[1].strip()  # e.g., '2pm'
-    match = re.match(r'(\d+)(am|pm)', end_time_str.lower())
+    match = re.match(r'(\d+)(am|pm)?', end_time_str.lower())
     if not match:
         return None
     hour = int(match.group(1))
-    ampm = match.group(2)
+    ampm = match.group(2) or ('pm' if hour == 12 else 'am')
     if ampm == 'pm' and hour != 12:
         hour += 12
     elif ampm == 'am' and hour == 12:
@@ -203,62 +201,116 @@ def parse_session_to_end_reminder(session_str):
         return None  # End reminder time already past
     return end_reminder_time
 
+def load_scheduled_sessions():
+    if os.path.exists(SCHEDULED_SESSIONS_FILE):
+        with open(SCHEDULED_SESSIONS_FILE, 'r') as f:
+            return json.load(f)
+    return []
+
+def save_scheduled_sessions(sessions):
+    with open(SCHEDULED_SESSIONS_FILE, 'w') as f:
+        json.dump(sessions, f, default=str)  # Use default=str for datetime serialization
+
+def extract_sessions(html_content):
+    sessions = []
+    # Try to find "Next Sessions:" first (for multiple)
+    match = re.search(r'Next\s+Sessions:', html_content, re.IGNORECASE)
+    if match:
+        start_pos = match.end()
+        # Find the end of this section (next heading or double newline or end)
+        end_match = re.search(r'<h\d>', html_content[start_pos:], re.IGNORECASE)
+        end_pos = end_match.start() if end_match else len(html_content) - start_pos
+        block = html_content[start_pos:start_pos + end_pos]
+        # Remove HTML tags
+        text_block = re.sub(r'<[^>]+>', '', block).strip()
+        # Split into lines (handling potential extra whitespace)
+        lines = [line.strip() for line in re.split(r'\s*\n\s*', text_block) if line.strip()]
+        for line in lines:
+            # Validate as a session (improved check: time-time, comma, date with ordinal)
+            if re.match(r'\d+(am|pm)?-\d+(am|pm)?,.*\d+(st|nd|rd|th)', line, re.IGNORECASE):
+                sessions.append(line)
+    else:
+        # Fallback to old single session logic (updated to handle plural if needed)
+        match = re.search(r'Next(?:\s+\w+)*\s+Sessions?:\s*([^<\n]+)', html_content, re.IGNORECASE)
+        if match:
+            session_raw = match.group(1).strip()
+            session_clean = re.sub(r'<[^>]+>', '', session_raw)
+            sessions.append(session_clean)
+    return sessions
+
 # Loop settings
+
+def check_and_send_notifications():
+    """Check for due notifications and send them."""
+    now = datetime.now()
+    sessions = load_scheduled_sessions()
+    updated = False
+    for session in sessions:
+        session_str = session['session']
+        if not session['notified']:
+            # Send initial notification if not done
+            send_discord_notification(f"🕰️ {session_str}", "date_time")
+            session['notified'] = True
+            updated = True
+        reminder_time_str = session.get('reminder_time')
+        reminder_time = datetime.fromisoformat(reminder_time_str) if reminder_time_str else None
+        if reminder_time and not session['reminder_sent'] and now >= reminder_time:
+            send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
+            session['reminder_sent'] = True
+            updated = True
+        end_reminder_time_str = session.get('end_reminder_time')
+        end_reminder_time = datetime.fromisoformat(end_reminder_time_str) if end_reminder_time_str else None
+        if end_reminder_time and not session['end_sent'] and now >= end_reminder_time:
+            send_discord_notification(f"🐰 End State", "end_state")
+            session['end_sent'] = True
+            updated = True
+    if updated:
+        save_scheduled_sessions(sessions)
 
 def main():
     url = 'https://octopus.energy/free-electricity/'
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
-
-    html_content = fetch_page_content(url)
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
-    if html_content:
-        session_str = extract_next_session(html_content)
-        if session_str:
-            logging.info(f"Found session: {session_str}")
-            last_sent = get_last_sent_session()
-            if test_mode:
-                logging.info("TEST_MODE=1: Bypassing last sent session check. Always sending notification.")
-                send_discord_notification(f"🕰️ {session_str}", "date_time")  # Add 🕰️ only for the main notification
-                # In test mode, wait 1 minute before sending the reminder for testing
-                logging.info("TEST_MODE: Waiting 1 minute before sending reminder...")
-                time.sleep(60)
-                logging.info("TEST_MODE: Sending reminder notification for testing.")
-                send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
-                # In test mode, wait another minute before sending the end state for testing
-                logging.info("TEST_MODE: Waiting another minute before sending end state...")
-                time.sleep(60)
-                logging.info("TEST_MODE: Sending end state notification for testing.")
-                send_discord_notification(f"🐰 End State", "end_state")
-            elif session_str != last_sent:
-                send_discord_notification(f"🕰️ {session_str}", "date_time")  # Add 🕰️ only for the main notification
-                update_last_sent_session(session_str)
-                # Schedule reminder for new session
-                reminder_time = parse_session_to_reminder(session_str)
-                if reminder_time:
-                    logging.info(f"Reminder scheduled for {reminder_time} (5 minutes before session start).")
-                    threading.Thread(target=lambda: (
-                        time.sleep(max(0, (reminder_time - datetime.now()).total_seconds())),
-                        send_discord_notification(f"📣 T- 5mins to Delta!", "5min_delta")
-                    )).start()
-                # Schedule end state reminder for new session
-                end_reminder_time = parse_session_to_end_reminder(session_str)
-                if end_reminder_time:
-                    logging.info(f"End state reminder scheduled for {end_reminder_time} (2 minutes before session end).")
-                    threading.Thread(target=lambda: (
-                        time.sleep(max(0, (end_reminder_time - datetime.now()).total_seconds())),
-                        send_discord_notification(f"🐰 End State", "end_state")
-                    )).start()
-            else:
-                logging.info("Already sent notification for this session.")
-        else:
-            logging.warning("No session text found between 'Next' and 'Next'.")
-    else:
-        logging.error("Failed to fetch page content.")
 
-    # Exit if SINGLE_RUN is set, otherwise loop every hour
-    if not single_run:
+    # Start a thread for checking notifications every minute
+    def notification_loop():
+        while True:
+            check_and_send_notifications()
+            time.sleep(60)
+    threading.Thread(target=notification_loop, daemon=True).start()
+
+    while True:
+        html_content = fetch_page_content(url)
+        if html_content:
+            current_sessions = extract_sessions(html_content)
+            stored_sessions = load_scheduled_sessions()
+            stored_session_strs = {s['session'] for s in stored_sessions}
+            
+            for session_str in current_sessions:
+                if session_str not in stored_session_strs:
+                    # New session: parse times and add to tracking
+                    reminder_time = parse_session_to_reminder(session_str)
+                    end_reminder_time = parse_session_to_end_reminder(session_str)
+                    new_session = {
+                        'session': session_str,
+                        'notified': False,
+                        'reminder_sent': False,
+                        'end_sent': False,
+                        'reminder_time': reminder_time.isoformat() if reminder_time else None,
+                        'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None
+                    }
+                    stored_sessions.append(new_session)
+                    logging.info(f"New session added: {session_str}")
+            
+            save_scheduled_sessions(stored_sessions)
+            # Remove past sessions (optional: clean up old ones)
+            now = datetime.now()
+            stored_sessions = [s for s in stored_sessions if not (s.get('end_reminder_time') and datetime.fromisoformat(s['end_reminder_time']) < now)]
+            save_scheduled_sessions(stored_sessions)
+        
+        if single_run:
+            break
         time.sleep(3600)
-        main()
 
 if __name__ == "__main__":
     main()
