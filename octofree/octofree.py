@@ -63,6 +63,9 @@ LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
 # New file for tracking scheduled sessions
 SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'scheduled_sessions.json')
 
+# New file for tracking past scheduled sessions
+PAST_SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'past_scheduled_sessions.json')
+
 def fetch_page_content(url):
     try:
         response = requests.get(url)
@@ -243,14 +246,46 @@ def parse_session_to_end_reminder(session_str):
         return None
     
     # Combine into session end datetime
-    session_end = date_obj.replace(hour=hour, minute=minute)
-    now = datetime.now()
-    if session_end <= now:
-        return None  # Session already ended or in past
-    end_reminder_time = session_end - timedelta(minutes=2)
-    if end_reminder_time <= now:
-        return None  # End reminder time already past
-    return end_reminder_time
+    return date_obj.replace(hour=hour, minute=minute)
+
+def parse_session_end_date(session_str):
+    """
+    Parse the session string to extract the end datetime.
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns a datetime object for the end time, or None if parsing fails.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
+    
+    # Remove ordinal suffix from date
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, flags=re.IGNORECASE)
+    
+    # Extract end time (after the dash)
+    end_time_str = time_part.split('-')[1].strip()  # e.g., '2pm'
+    match = re.match(r'(\d+)(am|pm)?', end_time_str.lower())
+    if not match:
+        return None
+    hour = int(match.group(1))
+    ampm = match.group(2) or ('pm' if hour == 12 else 'am')
+    if ampm == 'pm' and hour != 12:
+        hour += 12
+    elif ampm == 'am' and hour == 12:
+        hour = 0
+    minute = 0  # Assume on the hour
+    
+    # Parse date with current year
+    current_year = datetime.now().year
+    date_str_full = f"{date_part} {current_year}"
+    try:
+        date_obj = datetime.strptime(date_str_full, '%A %d %B %Y')
+    except ValueError:
+        return None
+    
+    # Combine into session end datetime
+    return date_obj.replace(hour=hour, minute=minute)
 
 def load_scheduled_sessions():
     if os.path.exists(SCHEDULED_SESSIONS_FILE):
@@ -266,6 +301,20 @@ def load_scheduled_sessions():
 def save_scheduled_sessions(sessions):
     with open(SCHEDULED_SESSIONS_FILE, 'w') as f:
         json.dump(sessions, f, default=str)  # Use default=str for datetime serialization
+
+def load_past_scheduled_sessions():
+    if os.path.exists(PAST_SCHEDULED_SESSIONS_FILE):
+        try:
+            with open(PAST_SCHEDULED_SESSIONS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            logging.warning(f"Invalid or empty JSON in {PAST_SCHEDULED_SESSIONS_FILE}. Treating as empty.")
+            return []
+    return []
+
+def save_past_scheduled_sessions(sessions):
+    with open(PAST_SCHEDULED_SESSIONS_FILE, 'w') as f:
+        json.dump(sessions, f, default=str)
 
 def extract_sessions(html_content):
     sessions = []
@@ -311,6 +360,32 @@ import threading
 # Lock for thread-safe JSON access
 json_lock = threading.Lock()
 
+def get_start_time_str(session_str):
+    """
+    Extract the start time string from the session string.
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns the start time string, e.g., '12pm', or None if parsing fails.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    start_time_str = time_part.split('-')[0].strip()  # e.g., '12pm'
+    return start_time_str
+
+def get_end_time_str(session_str):
+    """
+    Extract the end time string from the session string.
+    Assumes format like '12-2pm, Saturday 4th October'.
+    Returns the end time string, e.g., '2pm', or None if parsing fails.
+    """
+    parts = session_str.split(',')
+    if len(parts) != 2:
+        return None
+    time_part = parts[0].strip()  # e.g., '12-2pm'
+    end_time_str = time_part.split('-')[1].strip()  # e.g., '2pm'
+    return end_time_str
+
 def check_and_send_notifications():
     """Check and send pending notifications based on current time."""
     sessions = load_scheduled_sessions()
@@ -331,7 +406,15 @@ def check_and_send_notifications():
                     logging.error(f"Invalid reminder_time format for session {session['session']}: {session['reminder_time']}")
                     continue
             if now >= reminder_dt:
-                send_and_update(session, sessions, 'reminder_sent', f"📣 T-5mins to Delta!", "5min_delta")
+                start_time_str = None
+                if session.get('start_time'):
+                    try:
+                        start_dt = datetime.strptime(session['start_time'], '%Y-%m-%dT%H:%M:%S')
+                        start_time_str = start_dt.strftime('%-I%p').lower()
+                    except ValueError:
+                        pass
+                message = f"📣 T-5mins to Delta! - {start_time_str}" if start_time_str else "📣 T-5mins to Delta!"
+                send_and_update(session, sessions, 'reminder_sent', message, "5min_delta")
         
         # End notification
         if session.get('end_reminder_time') and not session['end_sent']:
@@ -345,7 +428,15 @@ def check_and_send_notifications():
                     continue
             if now >= end_dt and now - end_dt <= timedelta(minutes=5):
                 # Send only if within 5 minutes
-                send_and_update(session, sessions, 'end_sent', f"🐰 End State", "end_state")
+                end_time_str = None
+                if session.get('end_time'):
+                    try:
+                        end_dt_parsed = datetime.strptime(session['end_time'], '%Y-%m-%dT%H:%M:%S')
+                        end_time_str = end_dt_parsed.strftime('%-I%p').lower()
+                    except ValueError:
+                        pass
+                message = f"🐰 End State - {end_time_str}" if end_time_str else "🐰 End State"
+                send_and_update(session, sessions, 'end_sent', message, "end_state")
 
 def send_and_update(session, sessions_list, flag_key, message, notification_type):
     """Send notification and update/save the session flag."""
@@ -390,13 +481,17 @@ def main():
                     # New session: parse times and add to tracking
                     reminder_time = parse_session_to_reminder(session_str)
                     end_reminder_time = parse_session_to_end_reminder(session_str)
+                    start_time = parse_session_date(session_str)
+                    end_time = parse_session_end_date(session_str)
                     new_session = {
                         'session': session_str,
                         'notified': False,
                         'reminder_sent': False,
                         'end_sent': False,
                         'reminder_time': reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if reminder_time else None,
-                        'end_reminder_time': end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if end_reminder_time else None
+                        'end_reminder_time': end_reminder_time.strftime('%Y-%m-%dT%H:%M:%S') if end_reminder_time else None,
+                        'start_time': start_time.strftime('%Y-%m-%dT%H:%M:%S') if start_time else None,
+                        'end_time': end_time.strftime('%Y-%m-%dT%H:%M:%S') if end_time else None
                     }
                     stored_sessions.append(new_session)
                     logging.info(f"New session added: {session_str}")
@@ -435,9 +530,22 @@ def main():
                     end_time_str = end_dt.strftime('%Y-%m-%d %H:%M:%S')
                 logging.info(f"Session '{session_str}': Delta notification scheduled for {reminder_time_str}, end state notification scheduled for {end_time_str}")
             
-            # Remove past sessions (optional: clean up old ones)
+            # Move past sessions to past_scheduled_sessions.json instead of deleting
             now = datetime.now()
-            stored_sessions = [s for s in stored_sessions if not (s.get('end_reminder_time') and datetime.strptime(s['end_reminder_time'], '%Y-%m-%dT%H:%M:%S') < now)]
+            past_sessions = load_past_scheduled_sessions()
+            sessions_to_remove = []
+            for session in stored_sessions:
+                if session.get('end_reminder_time'):
+                    try:
+                        end_reminder_dt = datetime.strptime(session['end_reminder_time'], '%Y-%m-%dT%H:%M:%S')
+                        if end_reminder_dt < now:
+                            past_sessions.append(session)
+                            sessions_to_remove.append(session)
+                    except ValueError:
+                        logging.warning(f"Invalid end_reminder_time for session {session['session']}, skipping move to past.")
+            for session in sessions_to_remove:
+                stored_sessions.remove(session)
+            save_past_scheduled_sessions(past_sessions)
             save_scheduled_sessions(stored_sessions)
         else:
             logging.error("Failed to fetch HTML content.")  # Explicit error if fetch fails
