@@ -96,7 +96,7 @@ def parse_session_date(session_str):
     date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
     
     # Remove ordinal suffix from date
-    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, flags=re.IGNORECASE)
     
     # Extract start time (before the dash)
     start_time_str = time_part.split('-')[0].strip()  # e.g., '12'
@@ -173,7 +173,7 @@ def parse_session_to_reminder(session_str):
     date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
     
     # Remove ordinal suffix from date
-    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, flags=re.IGNORECASE)
     
     # Extract start time (before the dash)
     start_time_str = time_part.split('-')[0].strip()  # e.g., '12'
@@ -219,7 +219,7 @@ def parse_session_to_end_reminder(session_str):
     date_part = parts[1].strip()  # e.g., 'Saturday 4th October'
     
     # Remove ordinal suffix from date
-    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, re.IGNORECASE)
+    date_part = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', date_part, flags=re.IGNORECASE)
     
     # Extract end time (after the dash)
     end_time_str = time_part.split('-')[1].strip()  # e.g., '2pm'
@@ -278,7 +278,7 @@ def extract_sessions(html_content):
         end_pos = end_match.start() if end_match else len(html_content) - start_pos
         block = html_content[start_pos:start_pos + end_pos]
         # Replace <br> with \n to handle line breaks
-        block = re.sub(r'<br\s*/?>', '\n', block, re.IGNORECASE)
+        block = re.sub(r'<br\s*/?>', '\n', block, flags=re.IGNORECASE)
         # Remove HTML tags
         text_block = re.sub(r'<[^>]+>', '', block).strip()
         # Split by newlines or common separators to avoid concatenation
