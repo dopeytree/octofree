@@ -10,6 +10,7 @@ output_dir = os.path.abspath(os.path.expanduser(os.getenv('OUTPUT_DIR', os.path.
 SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'scheduled_sessions.json')
 PAST_SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'past_scheduled_sessions.json')
 LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
+LAST_EXTRACTED_SESSIONS_FILE = os.path.join(output_dir, 'last_extracted_sessions.json')
 
 json_lock = threading.Lock()
 
@@ -74,3 +75,18 @@ def update_last_sent_session(session_str):
         with open(LAST_SESSION_LOG, 'w') as f:
             for s in sessions:
                 f.write(f"{s}\n")
+
+def load_last_extracted_sessions():
+    if os.path.exists(LAST_EXTRACTED_SESSIONS_FILE):
+        try:
+            with open(LAST_EXTRACTED_SESSIONS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            logging.warning(f"Invalid or empty JSON in {LAST_EXTRACTED_SESSIONS_FILE}. Treating as empty.")
+            return []
+    return []
+
+def save_last_extracted_sessions(sessions):
+    with json_lock:
+        with open(LAST_EXTRACTED_SESSIONS_FILE, 'w') as f:
+            json.dump(sessions, f, default=str)

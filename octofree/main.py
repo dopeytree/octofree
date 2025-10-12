@@ -3,7 +3,7 @@ import os
 import logging
 from scraper import fetch_page_content, extract_sessions
 from notifier import check_and_send_notifications, send_discord_notification
-from storage import load_scheduled_sessions, save_scheduled_sessions, load_past_scheduled_sessions, save_past_scheduled_sessions, update_last_sent_session, get_last_sent_session
+from storage import load_scheduled_sessions, save_scheduled_sessions, load_past_scheduled_sessions, save_past_scheduled_sessions, update_last_sent_session, get_last_sent_session, load_last_extracted_sessions, save_last_extracted_sessions
 from utils import parse_session_date, parse_session_to_reminder, parse_session_to_end_reminder, parse_session_end_date
 from datetime import datetime, timedelta
 
@@ -39,68 +39,77 @@ def main():
         html_content = fetch_page_content(url)
         if html_content:
             logging.debug(f"Fetched HTML content length: {len(html_content)}")
-            current_sessions = extract_sessions(html_content)
-            logging.debug(f"Extracted sessions: {current_sessions}")
+            session_type, current_sessions = extract_sessions(html_content)
+            is_next = (session_type == 'next')
+            logging.debug(f"Extracted sessions: {current_sessions} (type: {session_type})")
             
-            # Load existing scheduled sessions
-            scheduled_sessions = load_scheduled_sessions()
-            past_sessions = load_past_scheduled_sessions()
+            # Check if sessions are the same as last time
+            last_sessions = load_last_extracted_sessions()
+            if set(current_sessions) == set(last_sessions):
+                logging.info("No new session planned")
+            else:
+                # Load existing scheduled sessions
+                scheduled_sessions = load_scheduled_sessions()
+                past_sessions = load_past_scheduled_sessions()
+                
+                # Process each extracted session
+                for session_str in current_sessions:
+                    # Check if already in scheduled or past
+                    existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
+                    past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
+                    
+                    if existing or past_existing:
+                        logging.info(f"Session already tracked: {session_str}")
+                        continue
+                    
+                    # Parse times
+                    start_time = parse_session_date(session_str)
+                    reminder_time = parse_session_to_reminder(session_str)
+                    end_time = parse_session_end_date(session_str)
+                    end_reminder_time = parse_session_to_end_reminder(session_str)
+                    
+                    if not start_time or not end_time:
+                        logging.warning(f"Failed to parse times for session: {session_str}")
+                        continue
+                    
+                    # Create session dict
+                    session_data = {
+                        'session': session_str,
+                        'start_time': start_time.isoformat(),
+                        'reminder_time': reminder_time.isoformat() if reminder_time else None,
+                        'end_time': end_time.isoformat(),
+                        'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None,
+                        'notified': False,
+                        'reminder_sent': False,
+                        'end_sent': False
+                    }
+                    
+                    # Add to scheduled
+                    scheduled_sessions.append(session_data)
+                    logging.info(f"Added new session: {session_str}")
+                    
+                    # Send initial notification only for upcoming sessions (unless TEST_MODE)
+                    if is_next and not test_mode:
+                        message = f"📣 Free Electric Session Scheduled: {session_str}"
+                        send_discord_notification(message, "date_time")
+                        session_data['notified'] = True
+                        logging.info(f"Initial notification sent for {session_str}")
+                    else:
+                        logging.info(f"Skipped notification for {session_str} (type: {session_type})")
+                    
+                    # Update last sent session log
+                    update_last_sent_session(session_str)
+                
+                # Save scheduled sessions
+                save_scheduled_sessions(scheduled_sessions)
+                save_past_scheduled_sessions(past_sessions)
+                
+                # Check and send notifications (reminders, end states)
+                check_and_send_notifications()
             
-            # Process each extracted session
-            for session_str in current_sessions:
-                # Check if already in scheduled or past
-                existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
-                past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
-                
-                if existing or past_existing:
-                    logging.info(f"Session already tracked: {session_str}")
-                    continue
-                
-                # Parse times
-                start_time = parse_session_date(session_str)
-                reminder_time = parse_session_to_reminder(session_str)
-                end_time = parse_session_end_date(session_str)
-                end_reminder_time = parse_session_to_end_reminder(session_str)
-                
-                if not start_time or not end_time:
-                    logging.warning(f"Failed to parse times for session: {session_str}")
-                    continue
-                
-                # Create session dict
-                session_data = {
-                    'session': session_str,
-                    'start_time': start_time.isoformat(),
-                    'reminder_time': reminder_time.isoformat() if reminder_time else None,
-                    'end_time': end_time.isoformat(),
-                    'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None,
-                    'notified': False,
-                    'reminder_sent': False,
-                    'end_sent': False
-                }
-                
-                # Add to scheduled
-                scheduled_sessions.append(session_data)
-                logging.info(f"Added new session: {session_str}")
-                
-                # Send initial notification (unless TEST_MODE)
-                if not test_mode:
-                    message = f"📣 Free Electric Session Scheduled: {session_str}"
-                    send_discord_notification(message, "date_time")
-                    session_data['notified'] = True
-                    logging.info(f"Initial notification sent for {session_str}")
-                else:
-                    logging.info(f"TEST_MODE: Skipped notification for {session_str}")
-                
-                # Update last sent session log
-                update_last_sent_session(session_str)
-            
-            # Save scheduled sessions
-            save_scheduled_sessions(scheduled_sessions)
-            save_past_scheduled_sessions(past_sessions)
-            
-            # Check and send notifications (reminders, end states)
-            check_and_send_notifications()
-            
+            # Always save current sessions as last extracted
+            save_last_extracted_sessions(current_sessions)
+        
         else:
             logging.error("Failed to fetch HTML content.")
         
