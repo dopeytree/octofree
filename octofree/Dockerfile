@@ -30,8 +30,8 @@ COPY . .
 # Set up configuration from template if no settings.env exists
 RUN if [ ! -f settings.env ]; then cp settings.env.template settings.env; fi
 
-# Create /data directory for volume mounting
-RUN mkdir -p /data
+# Create /data directory for volume mounting with full permissions
+RUN mkdir -p /data && chmod 777 /data
 
 # Declare volume for persistent data
 VOLUME ["/data"]
@@ -43,7 +43,7 @@ VOLUME ["/data"]
 ENV DISCORD_WEBHOOK_URL=""
 ENV SINGLE_RUN="false"
 ENV TEST_MODE="false"
-ENV OUTPUT_DIR="/data"
+ENV OUTPUT_DIR="/app/output"
 
 # Run your main script (explicitly from /app directory)
 WORKDIR /app

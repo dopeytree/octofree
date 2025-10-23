@@ -33,7 +33,6 @@ docker run -d \
     -e TEST_MODE="${TEST_MODE:-false}" \
     -e SINGLE_RUN="${SINGLE_RUN:-false}" \
     -e TEST_X_SCRAPER="${TEST_X_SCRAPER:-false}" \
-    -e OUTPUT_DIR="/data" \
     octofree
 
 # Check if container started successfully
