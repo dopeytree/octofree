@@ -12,7 +12,15 @@ from datetime import datetime, timedelta
 # Logging configuration (match original, but set to DEBUG for more detail)
 DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'output')
 output_dir = os.path.abspath(os.path.expanduser(os.getenv('OUTPUT_DIR', DEFAULT_OUTPUT_DIR)))
-os.makedirs(output_dir, exist_ok=True)
+
+# Create output directory with error handling
+try:
+    os.makedirs(output_dir, exist_ok=True)
+except PermissionError:
+    print(f"ERROR: Cannot create directory {output_dir} - permission denied")
+    print("If running in Docker, ensure the volume is mounted with proper permissions")
+    raise
+
 log_file = os.path.join(output_dir, 'octofree.log')
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to show more logs; revert to INFO if too verbose
