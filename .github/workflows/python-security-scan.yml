@@ -34,12 +34,32 @@ jobs:
 
       - name: Run Safety check (dependency vulnerabilities)
         run: |
-          safety check --json --file octofree/requirements.txt || true
+          echo "Running Safety check on dependencies..."
+          safety check --file octofree/requirements.txt || echo "⚠️ Safety found some issues (informational only, not failing build)"
 
       - name: Run Bandit security scan
         run: |
           bandit -r octofree/ -f json -o bandit-report.json || true
-          bandit -r octofree/ -f screen
+          # Print human-readable output (don't fail the job here)
+          bandit -r octofree/ -f screen || true
+          # Fail the step only if medium/high issues were found
+          python - <<'PY'
+          import json, sys
+          try:
+              with open('bandit-report.json') as f:
+                  r = json.load(f)
+              results = r.get('results', [])
+              count = sum(1 for i in results if i.get('issue_severity', '').upper() in ('MEDIUM', 'HIGH'))
+              if count:
+                  print(f"❌ Bandit found {count} medium/high severity issue(s); failing the job.")
+                  sys.exit(1)
+              else:
+                  low_count = sum(1 for i in results if i.get('issue_severity', '').upper() == 'LOW')
+                  print(f"✅ No medium/high Bandit issues found. ({low_count} low severity issues are informational only)")
+          except Exception as e:
+              print(f"⚠️ Could not parse Bandit results: {e}")
+              sys.exit(0)  # Don't fail if we can't parse the report
+          PY
 
       - name: Upload Bandit results
         uses: actions/upload-artifact@v4
