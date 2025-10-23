@@ -63,14 +63,3 @@ jobs:
           image-ref: octofree:${{ github.sha }}
           format: 'table'
           severity: 'CRITICAL,HIGH,MEDIUM'
-
-      - name: Docker Scout CVEs
-        uses: docker/scout-action@v1
-        if: github.event_name == 'pull_request'
-        with:
-          command: cves
-          image: octofree:${{ github.sha }}
-          only-severities: critical,high
-          sarif-file: scout-results.sarif
-          write-comment: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
