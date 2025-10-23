@@ -45,5 +45,6 @@ ENV SINGLE_RUN="false"
 ENV TEST_MODE="false"
 ENV OUTPUT_DIR="/data"
 
-# Run your main script
-CMD ["python3", "main.py"]
+# Run your main script (explicitly from /app directory)
+WORKDIR /app
+CMD ["python3", "/app/main.py"]
