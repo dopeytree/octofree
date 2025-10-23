@@ -1,0 +1,76 @@
+name: Docker Security Scan
+
+on:
+  push:
+    branches: [ "master", "main" ]
+    paths:
+      - 'octofree/Dockerfile'
+      - 'octofree/requirements.txt'
+      - '.github/workflows/docker-security-scan.yml'
+  pull_request:
+    branches: [ "master", "main" ]
+    paths:
+      - 'octofree/Dockerfile'
+      - 'octofree/requirements.txt'
+  schedule:
+    # Run weekly on Mondays at 9:00 AM UTC
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  docker-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./octofree
+          file: ./octofree/Dockerfile
+          push: false
+          load: true
+          tags: octofree:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: octofree:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+      - name: Run Trivy for PR comments
+        uses: aquasecurity/trivy-action@master
+        if: github.event_name == 'pull_request'
+        with:
+          image-ref: octofree:${{ github.sha }}
+          format: 'table'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+
+      - name: Docker Scout CVEs
+        uses: docker/scout-action@v1
+        if: github.event_name == 'pull_request'
+        with:
+          command: cves
+          image: octofree:${{ github.sha }}
+          only-severities: critical,high
+          sarif-file: scout-results.sarif
+          write-comment: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}

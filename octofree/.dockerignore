@@ -1,0 +1,23 @@
+# Ignore development and testing files
+output/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.git/
+.gitignore
+.vscode/
+.idea/
+*.log
+testing.md
+.DS_Store
+settings.env
+
+# Keep the template
+!settings.env.template

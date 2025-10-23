@@ -1,0 +1,55 @@
+name: Python Security Scan
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  schedule:
+    # Run weekly on Mondays at 10:00 AM UTC
+    - cron: '0 10 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit[toml]
+          if [ -f octofree/requirements.txt ]; then pip install -r octofree/requirements.txt; fi
+
+      - name: Run Safety check (dependency vulnerabilities)
+        run: |
+          safety check --json --file octofree/requirements.txt || true
+
+      - name: Run Bandit security scan
+        run: |
+          bandit -r octofree/ -f json -o bandit-report.json || true
+          bandit -r octofree/ -f screen
+
+      - name: Upload Bandit results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+      - name: Run pip-audit
+        uses: pypa/gh-action-pip-audit@v1.0.8
+        with:
+          inputs: octofree/requirements.txt
+          summary: true

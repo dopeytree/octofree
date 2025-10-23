@@ -6,6 +6,15 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    reviewers:
+      - "dopeytree"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
 
   # Update Python dependencies
   - package-ecosystem: "pip"
@@ -13,3 +22,28 @@ updates:
     schedule:
       interval: "daily"
     open-pull-requests-limit: 5
+    reviewers:
+      - "dopeytree"
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "dopeytree"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore"
+      include: "scope"

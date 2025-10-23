@@ -11,6 +11,7 @@ SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'scheduled_sessions.json')
 PAST_SCHEDULED_SESSIONS_FILE = os.path.join(output_dir, 'past_scheduled_sessions.json')
 LAST_SESSION_LOG = os.path.join(output_dir, 'last_sent_session.txt')
 LAST_EXTRACTED_SESSIONS_FILE = os.path.join(output_dir, 'last_extracted_sessions.json')
+X_SCRAPER_LOG = os.path.join(output_dir, 'x_scraper_log.json')
 
 json_lock = threading.Lock()
 
@@ -90,3 +91,39 @@ def save_last_extracted_sessions(sessions):
     with json_lock:
         with open(LAST_EXTRACTED_SESSIONS_FILE, 'w') as f:
             json.dump(sessions, f, default=str)
+
+def log_x_scraper_data(website_sessions, x_sessions, new_sessions_found):
+    """
+    Log X.com scraper activity to a separate JSON file for tracking and comparison.
+    This helps monitor scraper_x performance over time.
+    """
+    log_entry = {
+        'timestamp': datetime.now().isoformat(),
+        'website_sessions': website_sessions,
+        'x_sessions': x_sessions,
+        'new_sessions_from_x': new_sessions_found,
+        'x_provided_unique_data': len(new_sessions_found) > 0
+    }
+    
+    # Load existing log entries
+    log_entries = []
+    if os.path.exists(X_SCRAPER_LOG):
+        try:
+            with open(X_SCRAPER_LOG, 'r') as f:
+                log_entries = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            logging.warning(f"Invalid JSON in {X_SCRAPER_LOG}. Starting fresh.")
+            log_entries = []
+    
+    # Add new entry
+    log_entries.append(log_entry)
+    
+    # Keep only last 100 entries to prevent file from growing too large
+    log_entries = log_entries[-100:]
+    
+    # Save
+    with json_lock:
+        with open(X_SCRAPER_LOG, 'w') as f:
+            json.dump(log_entries, f, indent=2, default=str)
+    
+    logging.debug(f"[SCRAPER_X] Logged activity to {X_SCRAPER_LOG}")
