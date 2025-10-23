@@ -37,7 +37,15 @@ def check_and_send_notifications():
         
         # Check for initial notification
         if not session['notified'] and start_time > now:
-            message = f"📣 Free Electric Session Scheduled: {session_str}"
+            # Original message (commented for easy reverting):
+            # message = f"📣 Free Electric Session Scheduled: {session_str}"
+            
+            # New message with verification links
+            message = (
+                f"📣 Free Electric Session Scheduled: {session_str}\n"
+                f"- Check with: https://octopus.energy/free-electricity/\n"
+                f"  or https://x.com/savingsessions"
+            )
             send_discord_notification(message, "date_time")
             session['notified'] = True
             logging.info(f"Initial notification sent for {session_str}")
