@@ -66,9 +66,8 @@ def main():
     logging.info("")
     try:
         run_startup_validation(output_dir)
-    except Exception as e:
-        logging.warning("Startup validation encountered an error but continuing anyway")
-        logging.exception("Validation error details:", exc_info=True)
+    except Exception:
+        logging.exception("Startup validation encountered an error; continuing")
     logging.info("")
     
     if x_enabled:
