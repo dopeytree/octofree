@@ -16,7 +16,7 @@ def bearer_oauth(r):
     return r
 
 def connect_to_endpoint(url, params):
-    response = requests.request("GET", url, auth=bearer_oauth, params=params)
+    response = requests.request("GET", url, auth=bearer_oauth, params=params, timeout=30)
     if response.status_code != 200:
         logging.error(f"Request returned an error: {response.status_code} {response.text}")
         return None

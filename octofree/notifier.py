@@ -17,7 +17,7 @@ def send_discord_notification(message, notification_type="general"):
         "username": "🐙 Octopus - Free Electric!!! ⚡️"
     }
     try:
-        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+        response = requests.post(DISCORD_WEBHOOK_URL, json=data, timeout=10)
         logging.info(f"{notification_type} notification sent successfully: {message}")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
