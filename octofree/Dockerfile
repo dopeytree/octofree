@@ -30,18 +30,21 @@ COPY . .
 # Set up configuration from template if no settings.env exists
 RUN if [ ! -f settings.env ]; then cp settings.env.template settings.env; fi
 
-# Create a non-root user for security
-RUN addgroup -g 1000 appuser && \
-    adduser -D -u 1000 -G appuser appuser && \
-    chown -R appuser:appuser /app
+# Create /data directory for volume mounting
+RUN mkdir -p /data
 
-# Switch to non-root user
-USER appuser
+# Declare volume for persistent data
+VOLUME ["/data"]
+
+# Note: Running as root for Unraid compatibility
+# Unraid manages user permissions via template.xml settings
 
 # Environment variables can be passed during docker run
 ENV DISCORD_WEBHOOK_URL=""
 ENV SINGLE_RUN="false"
 ENV TEST_MODE="false"
+ENV OUTPUT_DIR="/data"
 
-# Run your main script
-CMD ["python3", "main.py"]
+# Run your main script (explicitly from /app directory)
+WORKDIR /app
+CMD ["python3", "/app/main.py"]

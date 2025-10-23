@@ -6,12 +6,21 @@ from scraper_x import fetch_and_extract_sessions
 from notifier import check_and_send_notifications, send_discord_notification
 from storage import load_scheduled_sessions, save_scheduled_sessions, load_past_scheduled_sessions, save_past_scheduled_sessions, update_last_sent_session, get_last_sent_session, load_last_extracted_sessions, save_last_extracted_sessions, log_x_scraper_data
 from utils import parse_session_date, parse_session_to_reminder, parse_session_to_end_reminder, parse_session_end_date
+from validator import run_startup_validation
 from datetime import datetime, timedelta
 
 # Logging configuration (match original, but set to DEBUG for more detail)
 DEFAULT_OUTPUT_DIR = os.path.join(os.path.dirname(__file__), 'output')
 output_dir = os.path.abspath(os.path.expanduser(os.getenv('OUTPUT_DIR', DEFAULT_OUTPUT_DIR)))
-os.makedirs(output_dir, exist_ok=True)
+
+# Create output directory with error handling
+try:
+    os.makedirs(output_dir, exist_ok=True)
+except PermissionError:
+    print(f"ERROR: Cannot create directory {output_dir} - permission denied")
+    print("If running in Docker, ensure the volume is mounted with proper permissions")
+    raise
+
 log_file = os.path.join(output_dir, 'octofree.log')
 logging.basicConfig(
     level=logging.DEBUG,  # Changed to DEBUG to show more logs; revert to INFO if too verbose
@@ -52,6 +61,14 @@ def main():
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
     x_enabled = bool(os.getenv('BEARER_TOKEN'))
+    
+    # Run startup validation and correction on historical data
+    logging.info("")
+    try:
+        run_startup_validation(output_dir)
+    except Exception:
+        logging.exception("Startup validation encountered an error; continuing")
+    logging.info("")
     
     if x_enabled:
         logging.info("X.com scraper (scraper_x) is ENABLED - will check X.com at 11am and 8pm")
@@ -110,9 +127,11 @@ def main():
             
             # Check if sessions are the same as last time
             last_sessions = load_last_extracted_sessions()
-            if set(current_sessions) == set(last_sessions):
+            if set(current_sessions) == set(last_sessions) and not test_mode:
                 logging.info("No new session planned")
             else:
+                if test_mode and set(current_sessions) == set(last_sessions):
+                    logging.info("[TEST_MODE] Sessions unchanged, but will process anyway for testing")
                 # Load existing scheduled sessions
                 scheduled_sessions = load_scheduled_sessions()
                 past_sessions = load_past_scheduled_sessions()
@@ -123,7 +142,14 @@ def main():
                     existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
                     past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
                     
-                    if existing or past_existing:
+                    # In TEST_MODE, reset notification flags to allow testing
+                    if test_mode and existing:
+                        logging.info(f"[TEST_MODE] Resetting notification flags for existing session: {session_str}")
+                        existing['notified'] = False
+                        existing['reminder_sent'] = False
+                        existing['end_sent'] = False
+                        # Don't skip - continue processing to send notification
+                    elif existing or past_existing:
                         logging.info(f"Session already tracked: {session_str}")
                         continue
                     
@@ -167,14 +193,22 @@ def main():
                     scheduled_sessions.append(session_data)
                     logging.info(f"Added new session: {session_str}")
                     
-                    # Send initial notification only for upcoming sessions (unless TEST_MODE)
-                    if is_next and not test_mode:
-                        message = f"📣 Free Electric Session Scheduled: {session_str}"
+                    # Send initial notification for upcoming sessions OR if in TEST_MODE
+                    if is_next or test_mode:
+                        # Use the new notification format from notifier.py
+                        message = (
+                            f"📣 Free Electric Session Scheduled: {session_str}\n"
+                            f"- Verify: https://octopus.energy/free-electricity/\n"
+                            f"  or https://x.com/savingsessions"
+                        )
                         send_discord_notification(message, "date_time")
                         session_data['notified'] = True
-                        logging.info(f"Initial notification sent for {session_str}")
+                        if test_mode:
+                            logging.info(f"[TEST_MODE] Initial notification sent for {session_str}")
+                        else:
+                            logging.info(f"Initial notification sent for {session_str}")
                     else:
-                        logging.info(f"Skipped notification for {session_str} (type: {session_type})")
+                        logging.info(f"Skipped notification for {session_str} (type: {session_type}, test_mode: {test_mode})")
                     
                     # Update last sent session log
                     update_last_sent_session(session_str)

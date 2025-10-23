@@ -2,9 +2,9 @@ name: Build and Scan
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, main ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, main ]
 
 jobs:
   build-and-scan:
@@ -35,7 +35,7 @@ jobs:
         tags: |
           type=ref,event=branch
           type=ref,event=pr
-          type=sha,prefix={{branch}}-
+          type=sha,prefix=sha-
           type=raw,value=latest,enable={{is_default_branch}}
 
     - name: Build and push Docker image
@@ -44,7 +44,8 @@ jobs:
       with:
         context: ./octofree
         file: ./octofree/Dockerfile
-        push: ${{ github.event_name != 'pull_request' }}
+        # Only push images from master branch after PR merge, not from PRs
+        push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
 

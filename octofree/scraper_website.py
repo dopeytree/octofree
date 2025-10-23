@@ -4,7 +4,7 @@ import logging
 
 def fetch_page_content(url):
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
         return response.text
     except Exception as e:
