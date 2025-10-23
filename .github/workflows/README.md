@@ -2,6 +2,8 @@
 
 This directory contains automated workflows for code quality, security scanning, and dependency management.
 
+**Note**: All workflows use `github/codeql-action@v4` for security scanning and SARIF uploads.
+
 ## 🔒 Security Workflows
 
 ### 1. CodeQL Security Scan (`codeql.yml`)
@@ -47,6 +49,20 @@ This directory contains automated workflows for code quality, security scanning,
   - Blocks GPL-3.0 and AGPL-3.0 licenses
   - Comments results on PRs
 
+## 🏗️ Build & Deploy
+
+### Build and Scan (`build-and-scan.yml`)
+- **Purpose**: Build Docker images and scan for vulnerabilities before publishing
+- **When it runs**: 
+  - Push to `master`/`main` branches
+  - Pull requests
+- **What it does**:
+  - Builds Docker image with proper tags (branch, PR, SHA, latest)
+  - Runs Trivy vulnerability scan on the built image
+  - Pushes to GitHub Container Registry (ghcr.io) only from master branch (not from PRs)
+  - Uploads scan results to GitHub Security tab
+- **Registry**: `ghcr.io/dopeytree/octofree`
+
 ## 🤖 Code Review
 
 ### CodeRabbit AI Review (`coderabbit.yml`)
@@ -74,6 +90,19 @@ This directory contains automated workflows for code quality, security scanning,
   - Creates PRs to update dependencies
   - Labels PRs appropriately
   - Assigns reviewers automatically
+
+### Auto-approve Dependabot PRs (`auto-merge.yml`) ⚠️
+- **Purpose**: Automatically approve Dependabot PRs after security validation
+- **Status**: ⚠️ **Currently disabled for manual review safety**
+- **When it runs**: On pull requests from Dependabot
+- **What it does**:
+  - Builds Docker image and tests
+  - Runs Trivy security scan
+  - Auto-approves PR if no CRITICAL/HIGH vulnerabilities found
+  - **Note**: Does NOT auto-merge (requires manual merge for safety)
+- **Security**: Will NOT approve if critical or high severity vulnerabilities are detected
+
+**Recommendation**: Keep this workflow disabled or remove it entirely if you prefer manual review of all dependency updates.
 
 ## 🔐 Required Permissions
 
