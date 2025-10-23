@@ -116,9 +116,11 @@ def main():
             
             # Check if sessions are the same as last time
             last_sessions = load_last_extracted_sessions()
-            if set(current_sessions) == set(last_sessions):
+            if set(current_sessions) == set(last_sessions) and not test_mode:
                 logging.info("No new session planned")
             else:
+                if test_mode and set(current_sessions) == set(last_sessions):
+                    logging.info("[TEST_MODE] Sessions unchanged, but will process anyway for testing")
                 # Load existing scheduled sessions
                 scheduled_sessions = load_scheduled_sessions()
                 past_sessions = load_past_scheduled_sessions()
@@ -129,7 +131,14 @@ def main():
                     existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
                     past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
                     
-                    if existing or past_existing:
+                    # In TEST_MODE, reset notification flags to allow testing
+                    if test_mode and existing:
+                        logging.info(f"[TEST_MODE] Resetting notification flags for existing session: {session_str}")
+                        existing['notified'] = False
+                        existing['reminder_sent'] = False
+                        existing['end_sent'] = False
+                        # Don't skip - continue processing to send notification
+                    elif existing or past_existing:
                         logging.info(f"Session already tracked: {session_str}")
                         continue
                     
@@ -173,14 +182,22 @@ def main():
                     scheduled_sessions.append(session_data)
                     logging.info(f"Added new session: {session_str}")
                     
-                    # Send initial notification only for upcoming sessions (unless TEST_MODE)
-                    if is_next and not test_mode:
-                        message = f"📣 Free Electric Session Scheduled: {session_str}"
+                    # Send initial notification for upcoming sessions OR if in TEST_MODE
+                    if is_next or test_mode:
+                        # Use the new notification format from notifier.py
+                        message = (
+                            f"📣 Free Electric Session Scheduled: {session_str}\n"
+                            f"- Verify: https://octopus.energy/free-electricity/\n"
+                            f"  or https://x.com/savingsessions"
+                        )
                         send_discord_notification(message, "date_time")
                         session_data['notified'] = True
-                        logging.info(f"Initial notification sent for {session_str}")
+                        if test_mode:
+                            logging.info(f"[TEST_MODE] Initial notification sent for {session_str}")
+                        else:
+                            logging.info(f"Initial notification sent for {session_str}")
                     else:
-                        logging.info(f"Skipped notification for {session_str} (type: {session_type})")
+                        logging.info(f"Skipped notification for {session_str} (type: {session_type}, test_mode: {test_mode})")
                     
                     # Update last sent session log
                     update_last_sent_session(session_str)
