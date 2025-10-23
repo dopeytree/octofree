@@ -4,6 +4,8 @@ This directory contains automated workflows for code quality, security scanning,
 
 ## 🔒 Security Workflows
 
+> **Note**: All workflows use `github/codeql-action@v4` for security scanning and SARIF uploads.
+
 ### 1. CodeQL Security Scan (`codeql.yml`)
 - **Purpose**: Static code analysis for security vulnerabilities
 - **When it runs**: 
@@ -11,22 +13,35 @@ This directory contains automated workflows for code quality, security scanning,
   - Pull requests
   - Weekly on Mondays at 6:00 AM UTC
 - **What it does**: Scans Python code for security vulnerabilities and uploads results to GitHub Security tab
+- **Actions**: Uses CodeQL v4 for init, autobuild, and analyze steps
 
-### 2. Docker Security Scan (`docker-security-scan.yml`)
-- **Purpose**: Scan Docker images for vulnerabilities
+### 2. Build and Scan (`build-and-scan.yml`)
+- **Purpose**: Build Docker image, push to registry, and scan for vulnerabilities
+- **When it runs**: 
+  - Push to `master`/`main` branches
+  - Pull requests
+- **What it does**:
+  - Builds Docker image for the octofree application
+  - Pushes to GitHub Container Registry (only from master branch, not PRs)
+  - Tags images with branch name, PR number, SHA, and 'latest'
+  - Scans built image with Trivy for CRITICAL and HIGH vulnerabilities
+  - Uploads SARIF results to GitHub Security tab using CodeQL v4
+- **Registry**: `ghcr.io/dopeytree/octofree`
+
+### 3. Docker Security Scan (`docker-security-scan.yml`)
+- **Purpose**: Dedicated security scanning of Docker images
 - **When it runs**: 
   - Push/PR when Dockerfile or requirements.txt changes
   - Weekly on Mondays at 9:00 AM UTC
 - **Tools used**:
   - **Trivy**: Comprehensive vulnerability scanner
-  - **Docker Scout**: Docker's native security scanner
 - **What it does**: 
-  - Builds the Docker image
+  - Builds the Docker image (without pushing)
   - Scans for CRITICAL and HIGH severity CVEs
-  - Uploads results to GitHub Security tab
-  - Comments on PRs with findings
+  - Uploads results to GitHub Security tab using CodeQL v4
+  - Provides detailed table output for PRs (CRITICAL, HIGH, MEDIUM)
 
-### 3. Python Security Scan (`python-security-scan.yml`)
+### 4. Python Security Scan (`python-security-scan.yml`)
 - **Purpose**: Scan Python dependencies and code for security issues
 - **When it runs**: 
   - Push to `master`/`main` branches
@@ -38,7 +53,7 @@ This directory contains automated workflows for code quality, security scanning,
   - **pip-audit**: Audits Python packages for known vulnerabilities
 - **What it does**: Identifies vulnerable dependencies and insecure code patterns
 
-### 4. Dependency Review (`dependency-review.yml`)
+### 5. Dependency Review (`dependency-review.yml`)
 - **Purpose**: Review dependency changes in pull requests
 - **When it runs**: On all pull requests
 - **What it does**:
@@ -74,6 +89,17 @@ This directory contains automated workflows for code quality, security scanning,
   - Creates PRs to update dependencies
   - Labels PRs appropriately
   - Assigns reviewers automatically
+
+### Auto-approve Dependabot PRs (`auto-merge.yml`) ⚠️ DISABLED
+- **Purpose**: Automatically approve Dependabot PRs after security checks
+- **Status**: ⚠️ **Currently disabled/failing by design for safety**
+- **When it runs**: On Dependabot pull requests (if enabled)
+- **What it does**:
+  - Builds Docker image to verify it works
+  - Runs Trivy security scan
+  - Checks for CRITICAL or HIGH vulnerabilities
+  - Auto-approves PR if all checks pass (requires manual merge)
+- **Note**: This workflow is configured to fail as a safety measure - all PRs require manual review and approval before merging
 
 ## 🔐 Required Permissions
 
