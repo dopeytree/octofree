@@ -1,0 +1,278 @@
+"""
+Data Validation and Correction Module
+
+This module validates and corrects previously saved session data to ensure
+that any fixes to parsing logic are also applied to historical data.
+Runs on container startup to maintain data integrity.
+"""
+
+import logging
+import json
+from datetime import datetime
+from typing import List, Dict, Tuple
+from utils import parse_session_date, parse_session_to_reminder, parse_session_to_end_reminder, parse_session_end_date
+
+
+def validate_session_times(session_data: Dict) -> Tuple[bool, List[str]]:
+    """
+    Validate that session times are correctly parsed.
+    
+    Returns:
+        Tuple of (is_valid, list_of_errors)
+    """
+    errors = []
+    session_str = session_data.get('session', '')
+    
+    if not session_str:
+        errors.append("Missing session string")
+        return False, errors
+    
+    # Parse times using current (fixed) parsing logic
+    try:
+        start_time = datetime.fromisoformat(session_data['start_time'])
+        end_time = datetime.fromisoformat(session_data['end_time'])
+        
+        # Calculate duration
+        duration_hours = (end_time - start_time).total_seconds() / 3600
+        
+        # Check for common errors
+        # 1. Duration should be between 0 and 4 hours typically
+        if duration_hours < 0:
+            errors.append(f"End time ({end_time.strftime('%H:%M')}) is before start time ({start_time.strftime('%H:%M')})")
+        elif duration_hours > 4:
+            errors.append(f"Duration is unusually long: {duration_hours:.1f} hours (start: {start_time.strftime('%H:%M')}, end: {end_time.strftime('%H:%M')})")
+        
+        # 2. Check if time matches the session string
+        # Extract time range from session string (e.g., "9-10pm" or "11am-12pm")
+        import re
+        time_match = re.match(r'(\d+)(am|pm)?-(\d+)(am|pm)', session_str, re.IGNORECASE)
+        if time_match:
+            start_hour_str = time_match.group(1)
+            start_ampm = time_match.group(2)  # May be None
+            end_hour_str = time_match.group(3)
+            end_ampm = time_match.group(4).lower()
+            
+            # Expected end hour
+            expected_end_hour = int(end_hour_str)
+            if end_ampm == 'pm' and expected_end_hour != 12:
+                expected_end_hour += 12
+            elif end_ampm == 'am' and expected_end_hour == 12:
+                expected_end_hour = 0
+            
+            # Check if stored end time matches expected
+            if end_time.hour != expected_end_hour:
+                errors.append(f"End time mismatch: stored as {end_time.strftime('%H:%M')} but session string indicates {end_hour_str}{end_ampm} (hour {expected_end_hour})")
+            
+            # Expected start hour
+            expected_start_hour = int(start_hour_str)
+            # If start has explicit AM/PM, use it; otherwise inherit from end
+            if start_ampm:
+                actual_start_ampm = start_ampm.lower()
+            else:
+                actual_start_ampm = end_ampm
+                
+            if actual_start_ampm == 'pm' and expected_start_hour != 12:
+                expected_start_hour += 12
+            elif actual_start_ampm == 'am' and expected_start_hour == 12:
+                expected_start_hour = 0
+                
+            # Check if stored start time matches expected
+            if start_time.hour != expected_start_hour:
+                if start_ampm:
+                    errors.append(f"Start time mismatch: stored as {start_time.strftime('%H:%M')} but session string indicates {start_hour_str}{start_ampm} (hour {expected_start_hour})")
+                else:
+                    errors.append(f"Start time mismatch: stored as {start_time.strftime('%H:%M')} but session string indicates {start_hour_str} (hour {expected_start_hour} based on {end_ampm})")
+        
+    except (ValueError, KeyError) as e:
+        errors.append(f"Error parsing datetime fields: {e}")
+        return False, errors
+    
+    return len(errors) == 0, errors
+
+
+def correct_session_data(session_data: Dict) -> Dict:
+    """
+    Correct session data by re-parsing the session string with current logic.
+    
+    Returns:
+        Corrected session data dictionary
+    """
+    session_str = session_data['session']
+    
+    # Re-parse times using current (fixed) logic
+    start_time = parse_session_date(session_str)
+    reminder_time = parse_session_to_reminder(session_str)
+    end_time = parse_session_end_date(session_str)
+    end_reminder_time = parse_session_to_end_reminder(session_str)
+    
+    # Create corrected data
+    corrected = session_data.copy()
+    
+    if start_time:
+        corrected['start_time'] = start_time.isoformat()
+    if reminder_time:
+        corrected['reminder_time'] = reminder_time.isoformat()
+    if end_time:
+        corrected['end_time'] = end_time.isoformat()
+    if end_reminder_time:
+        corrected['end_reminder_time'] = end_reminder_time.isoformat()
+    
+    return corrected
+
+
+def log_correction_details(session_str: str, old_data: Dict, new_data: Dict, errors: List[str]):
+    """
+    Log detailed information about what was corrected.
+    """
+    logging.warning(f"🔧 CORRECTING SESSION DATA: '{session_str}'")
+    logging.warning(f"   Errors found: {len(errors)}")
+    for error in errors:
+        logging.warning(f"   - {error}")
+    
+    # Log old vs new times
+    old_start = datetime.fromisoformat(old_data['start_time'])
+    new_start = datetime.fromisoformat(new_data['start_time'])
+    old_end = datetime.fromisoformat(old_data['end_time'])
+    new_end = datetime.fromisoformat(new_data['end_time'])
+    
+    logging.warning(f"   OLD: {old_start.strftime('%Y-%m-%d %H:%M:%S')} to {old_end.strftime('%H:%M:%S')} (duration: {(old_end - old_start).total_seconds() / 3600:.1f}h)")
+    logging.warning(f"   NEW: {new_start.strftime('%Y-%m-%d %H:%M:%S')} to {new_end.strftime('%H:%M:%S')} (duration: {(new_end - new_start).total_seconds() / 3600:.1f}h)")
+
+
+def validate_and_correct_sessions_file(file_path: str, file_description: str) -> bool:
+    """
+    Validate and correct a sessions JSON file.
+    
+    Returns:
+        True if corrections were made, False otherwise
+    """
+    try:
+        # Load the file
+        with open(file_path, 'r') as f:
+            sessions = json.load(f)
+        
+        if not sessions:
+            logging.info(f"✓ {file_description}: No sessions to validate")
+            return False
+        
+        logging.info(f"🔍 Validating {file_description}: {len(sessions)} session(s)")
+        
+        corrections_made = False
+        corrected_sessions = []
+        
+        for session_data in sessions:
+            session_str = session_data.get('session', 'Unknown')
+            
+            # Validate the session
+            is_valid, errors = validate_session_times(session_data)
+            
+            if is_valid:
+                logging.info(f"   ✓ '{session_str}' - Valid")
+                corrected_sessions.append(session_data)
+            else:
+                # Correct the session
+                corrected_data = correct_session_data(session_data)
+                
+                # Log the correction
+                log_correction_details(session_str, session_data, corrected_data, errors)
+                
+                corrected_sessions.append(corrected_data)
+                corrections_made = True
+        
+        # Save corrected data if changes were made
+        if corrections_made:
+            with open(file_path, 'w') as f:
+                json.dump(corrected_sessions, f, indent=2)
+            logging.warning(f"✓ {file_description}: Corrections saved to {file_path}")
+        else:
+            logging.info(f"✓ {file_description}: All sessions valid, no corrections needed")
+        
+        return corrections_made
+        
+    except FileNotFoundError:
+        logging.info(f"✓ {file_description}: File not found (new installation)")
+        return False
+    except json.JSONDecodeError as e:
+        logging.error(f"❌ {file_description}: Invalid JSON format: {e}")
+        return False
+    except Exception as e:
+        logging.error(f"❌ {file_description}: Unexpected error: {e}")
+        return False
+
+
+def validate_and_correct_extracted_sessions(file_path: str) -> bool:
+    """
+    Validate extracted sessions file (simpler format - just strings).
+    
+    Returns:
+        True if file is valid, False otherwise
+    """
+    try:
+        with open(file_path, 'r') as f:
+            sessions = json.load(f)
+        
+        if not sessions:
+            logging.info(f"✓ Last Extracted Sessions: No sessions found")
+            return True
+        
+        logging.info(f"🔍 Validating Last Extracted Sessions: {len(sessions)} session(s)")
+        
+        # Just verify it's a list of strings
+        if isinstance(sessions, list) and all(isinstance(s, str) for s in sessions):
+            logging.info(f"   ✓ All {len(sessions)} extracted session(s) are valid strings")
+            return True
+        else:
+            logging.warning(f"   ⚠️ Extracted sessions format is incorrect")
+            return False
+            
+    except FileNotFoundError:
+        logging.info(f"✓ Last Extracted Sessions: File not found (new installation)")
+        return True
+    except Exception as e:
+        logging.error(f"❌ Last Extracted Sessions: Error: {e}")
+        return False
+
+
+def run_startup_validation(output_dir: str) -> Dict[str, bool]:
+    """
+    Run validation and correction on all session files at startup.
+    
+    Returns:
+        Dictionary with results for each file
+    """
+    import os
+    
+    logging.info("=" * 70)
+    logging.info("🚀 STARTING DATA VALIDATION AND CORRECTION")
+    logging.info("=" * 70)
+    
+    results = {}
+    
+    # Validate scheduled sessions
+    scheduled_path = os.path.join(output_dir, 'scheduled_sessions.json')
+    results['scheduled'] = validate_and_correct_sessions_file(
+        scheduled_path,
+        "Scheduled Sessions"
+    )
+    
+    # Validate past scheduled sessions
+    past_path = os.path.join(output_dir, 'past_scheduled_sessions.json')
+    results['past'] = validate_and_correct_sessions_file(
+        past_path,
+        "Past Scheduled Sessions"
+    )
+    
+    # Validate last extracted sessions (simpler format)
+    extracted_path = os.path.join(output_dir, 'last_extracted_sessions.json')
+    results['extracted'] = validate_and_correct_extracted_sessions(extracted_path)
+    
+    # Summary
+    logging.info("=" * 70)
+    if any(results.values()):
+        logging.warning("⚠️ VALIDATION COMPLETE: Corrections were made to historical data")
+        logging.warning("   The data has been updated to match current parsing logic")
+    else:
+        logging.info("✓ VALIDATION COMPLETE: All data is correct, no changes needed")
+    logging.info("=" * 70)
+    
+    return results

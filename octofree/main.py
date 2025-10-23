@@ -6,6 +6,7 @@ from scraper_x import fetch_and_extract_sessions
 from notifier import check_and_send_notifications, send_discord_notification
 from storage import load_scheduled_sessions, save_scheduled_sessions, load_past_scheduled_sessions, save_past_scheduled_sessions, update_last_sent_session, get_last_sent_session, load_last_extracted_sessions, save_last_extracted_sessions, log_x_scraper_data
 from utils import parse_session_date, parse_session_to_reminder, parse_session_to_end_reminder, parse_session_end_date
+from validator import run_startup_validation
 from datetime import datetime, timedelta
 
 # Logging configuration (match original, but set to DEBUG for more detail)
@@ -52,6 +53,11 @@ def main():
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
     x_enabled = bool(os.getenv('BEARER_TOKEN'))
+    
+    # Run startup validation and correction on historical data
+    logging.info("")
+    run_startup_validation(output_dir)
+    logging.info("")
     
     if x_enabled:
         logging.info("X.com scraper (scraper_x) is ENABLED - will check X.com at 11am and 8pm")
