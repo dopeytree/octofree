@@ -67,14 +67,14 @@ def connect_to_endpoint(url, params):
         response.raise_for_status()  # Raise exception for non-2xx status codes
         return response.json()
     except requests.RequestException as e:
-        logging.error(f"[SCRAPER_X] Request to {url} failed: {e}")
+        logging.error(f"❌ [X SCRAPER] Request to {url} failed: {e}")
         return None
     except (ValueError, KeyError) as e:
         # Catch JSON decode errors and other parsing issues
         response_preview = response.text[:200] if hasattr(response, 'text') else "N/A"
         status_code = response.status_code if hasattr(response, 'status_code') else "N/A"
         logging.exception(
-            f"[SCRAPER_X] Failed to parse JSON response from {url}. "
+            f"❌ [X SCRAPER] Failed to parse JSON response from {url}. "
             f"Status: {status_code}, Response preview: {response_preview}..."
         )
         return None
@@ -97,7 +97,7 @@ def fetch_tweets_with_hashtag():
     """
     bearer_token = os.getenv('BEARER_TOKEN')
     if not bearer_token:
-        logging.error("BEARER_TOKEN not set in environment variables.")
+        logging.error("⚠️ [X SCRAPER] BEARER_TOKEN not set in environment variables.")
         return []
     
     search_url = "https://api.twitter.com/2/tweets/search/recent"

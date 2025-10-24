@@ -30,7 +30,7 @@ def fetch_page_content(url):
         response.raise_for_status()
         return response.text
     except Exception as e:
-        logging.error(f"Error fetching page: {e}")
+        logging.error(f"❌ [WEBSITE SCRAPER] Error fetching page: {e}")
         return None
 
 def extract_sessions(html_content):
@@ -59,7 +59,7 @@ def extract_sessions(html_content):
     """
     # Early guard: ensure html_content is valid
     if html_content is None or not isinstance(html_content, str):
-        logging.warning("[SCRAPER_WEBSITE] html_content is None or not a string, cannot extract sessions")
+        logging.warning("⚠️ [WEBSITE SCRAPER] html_content is None or not a string, cannot extract sessions")
         return (None, [])
     
     sessions = []

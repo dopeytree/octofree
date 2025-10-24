@@ -199,22 +199,40 @@ def validate_and_correct_sessions_file(file_path: str, file_description: str) ->
             sessions = json.load(f)
         
         if not sessions:
-            logging.info(f"✓ {file_description}: No sessions to validate")
+            logging.info(f"  ✓ {file_description}: No sessions to validate")
             return False
         
-        logging.info(f"🔍 Validating {file_description}: {len(sessions)} session(s)")
+        logging.info(f"🔍 VALIDATING {file_description.upper()}: {len(sessions)} session(s)")
+        
+        # Sort sessions by start time (recent to old) for chronological display
+        try:
+            sorted_sessions = sorted(
+                sessions,
+                key=lambda s: datetime.fromisoformat(s.get('start_time', '1970-01-01T00:00:00')),
+                reverse=True  # Most recent first
+            )
+        except (ValueError, TypeError):
+            # Fallback to original order if sorting fails
+            logging.warning(f"  ⚠️ Could not sort sessions by date, using file order")
+            sorted_sessions = sessions
         
         corrections_made = False
         corrected_sessions = []
         
-        for session_data in sessions:
+        for i, session_data in enumerate(sorted_sessions):
             session_str = session_data.get('session', 'Unknown')
+            
+            # Use box drawing characters for tree structure
+            if i == len(sorted_sessions) - 1:
+                prefix = "└──"
+            else:
+                prefix = "├──"
             
             # Validate the session
             is_valid, errors = validate_session_times(session_data)
             
             if is_valid:
-                logging.info(f"   ✓ '{session_str}' - Valid")
+                logging.info(f"  {prefix} ✓ '{session_str}' - Valid")
                 corrected_sessions.append(session_data)
             else:
                 # Correct the session
@@ -232,7 +250,7 @@ def validate_and_correct_sessions_file(file_path: str, file_description: str) ->
                 json.dump(corrected_sessions, f, indent=2)
             logging.warning(f"✓ {file_description}: Corrections saved to {file_path}")
         else:
-            logging.info(f"✓ {file_description}: All sessions valid, no corrections needed")
+            logging.info(f"✅ {file_description}: All sessions valid, no corrections needed")
         
         return corrections_made
         
@@ -266,17 +284,23 @@ def validate_and_correct_extracted_sessions(file_path: str) -> bool:
             sessions = json.load(f)
         
         if not sessions:
-            logging.info(f"✓ Last Extracted Sessions: No sessions found")
+            logging.info(f"  ✓ Last Extracted Sessions: No sessions found")
             return True
         
-        logging.info(f"🔍 Validating Last Extracted Sessions: {len(sessions)} session(s)")
+        logging.info(f"🔍 VALIDATING LAST EXTRACTED SESSIONS: {len(sessions)} session(s)")
         
-        # Just verify it's a list of strings
+        # Just verify it's a list of strings and show each one in tree format
         if isinstance(sessions, list) and all(isinstance(s, str) for s in sessions):
-            logging.info(f"   ✓ All {len(sessions)} extracted session(s) are valid strings")
+            for i, session_str in enumerate(sessions):
+                # Use box drawing characters for tree structure
+                if i == len(sessions) - 1:
+                    prefix = "└──"
+                else:
+                    prefix = "├──"
+                logging.info(f"  {prefix} ✓ '{session_str}' - Valid string")
             return True
         else:
-            logging.warning(f"   ⚠️ Extracted sessions format is incorrect")
+            logging.warning(f"  ⚠️ Extracted sessions format is incorrect")
             return False
             
     except FileNotFoundError:
@@ -311,9 +335,8 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     """
     import os
     
-    logging.info("=" * 70)
-    logging.info("🚀 STARTING DATA VALIDATION AND CORRECTION")
-    logging.info("=" * 70)
+    logging.info("🚀 STARTING DATA VALIDATION & CORRECTION")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     
     results = {}
     
@@ -336,12 +359,14 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     results['extracted'] = validate_and_correct_extracted_sessions(extracted_path)
     
     # Summary
-    logging.info("=" * 70)
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if any(results.values()):
-        logging.warning("⚠️ VALIDATION COMPLETE: Corrections were made to historical data")
-        logging.warning("   The data has been updated to match current parsing logic")
+        logging.warning("🟡 VALIDATION COMPLETE")
+        logging.warning("  ⚠️ Corrections applied to historical data")
+        logging.warning("  └─ Updated to match current parsing logic")
     else:
-        logging.info("✓ VALIDATION COMPLETE: All data is correct, no changes needed")
-    logging.info("=" * 70)
+        logging.info("🟢 VALIDATION COMPLETE")
+        logging.info("  ✓ All data is correct, no changes needed")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     
     return results
