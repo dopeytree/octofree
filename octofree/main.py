@@ -57,7 +57,12 @@ logging.basicConfig(
 def _log_loaded_settings():
     """Log current configuration settings for debugging."""
     logging.info("Loaded settings:")
-    logging.info(f"  DISCORD_WEBHOOK_URL={os.getenv('DISCORD_WEBHOOK_URL')}")
+    # Mask webhook URL for security - never log the full URL
+    webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+    if webhook_url:
+        logging.info(f"  DISCORD_WEBHOOK_URL=SET (length: {len(webhook_url)} chars)")
+    else:
+        logging.info(f"  DISCORD_WEBHOOK_URL=NOT SET")
     logging.info(f"  TEST_MODE={os.getenv('TEST_MODE')}")
     logging.info(f"  SINGLE_RUN={os.getenv('SINGLE_RUN')}")
     logging.info(f"  OUTPUT_DIR={output_dir}")

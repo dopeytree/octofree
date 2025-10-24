@@ -33,8 +33,17 @@ def bearer_oauth(r):
     
     Returns:
         Modified request object with authentication headers.
+    
+    Raises:
+        ValueError: If BEARER_TOKEN is not set or is empty.
     """
     bearer_token = os.getenv('BEARER_TOKEN')
+    if not bearer_token:
+        raise ValueError(
+            "BEARER_TOKEN environment variable is not set or is empty. "
+            "X.com scraper requires a valid bearer token. "
+            "Set BEARER_TOKEN in settings.env or disable X.com scraping."
+        )
     r.headers["Authorization"] = f"Bearer {bearer_token}"
     r.headers["User-Agent"] = "v2RecentSearchPython"
     return r
@@ -53,11 +62,13 @@ def connect_to_endpoint(url, params):
         dict or None: Parsed JSON response, or None if request fails.
             Logs error details on failure.
     """
-    response = requests.request("GET", url, auth=bearer_oauth, params=params, timeout=30)
-    if response.status_code != 200:
-        logging.error(f"Request returned an error: {response.status_code} {response.text}")
+    try:
+        response = requests.request("GET", url, auth=bearer_oauth, params=params, timeout=30)
+        response.raise_for_status()  # Raise exception for non-2xx status codes
+        return response.json()
+    except requests.RequestException as e:
+        logging.error(f"[SCRAPER_X] Request to {url} failed: {e}")
         return None
-    return response.json()
 
 def fetch_tweets_with_hashtag():
     """

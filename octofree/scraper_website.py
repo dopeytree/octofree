@@ -57,6 +57,11 @@ def extract_sessions(html_content):
             - sessions (list): List of session strings found (deduplicated)
                 Example: ['12-3pm, Saturday 25th October', '9-10pm, Friday 24th October']
     """
+    # Early guard: ensure html_content is valid
+    if html_content is None or not isinstance(html_content, str):
+        logging.warning("[SCRAPER_WEBSITE] html_content is None or not a string, cannot extract sessions")
+        return (None, [])
+    
     sessions = []
     session_type = None
     # Try to find "Next Sessions:" first (for multiple)
