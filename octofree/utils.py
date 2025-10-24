@@ -1,11 +1,38 @@
+"""
+Utility functions for parsing Octopus Energy session strings.
+
+This module provides functions to parse session strings in various formats
+(e.g., "9-10pm, Friday 24th October", "12-3pm, Saturday 25th October")
+and extract relevant datetime information for scheduling notifications.
+
+Handles:
+- Start and end time parsing
+- AM/PM inference when not explicitly stated
+- Reminder time calculation (5 minutes before events)
+- Date parsing with ordinal suffix removal
+- Validation of parsed times
+"""
+
 import re
 from datetime import datetime, timedelta
 
 def parse_session_date(session_str):
     """
-    Parse the session string to extract a datetime for sorting.
-    Assumes format like '12-2pm, Saturday 4th October' or '9-10pm, Friday 24th October'.
-    Returns a datetime object, or None if parsing fails.
+    Parse session string to extract start datetime for sorting and scheduling.
+    
+    Handles various formats including:
+    - "9-10pm, Friday 24th October"
+    - "12-3pm, Saturday 25th October" (TRIPLE SESSION format)
+    - "11am-12pm, Monday 28th October"
+    
+    Automatically infers AM/PM for start time based on end time when not specified.
+    Validates duration to detect parsing errors (flags sessions > 4 hours).
+    
+    Args:
+        session_str (str): Session description string from Octopus Energy website.
+    
+    Returns:
+        datetime or None: Start datetime of the session, or None if parsing fails.
     """
     parts = session_str.split(',')
     if len(parts) != 2:
@@ -77,9 +104,18 @@ def parse_session_date(session_str):
 
 def parse_session_to_reminder(session_str):
     """
-    Parse the session string to extract the reminder time (5 minutes before start).
-    Assumes format like '12-2pm, Saturday 4th October' or '9-10pm, Friday 24th October'.
-    Returns a datetime object for the reminder, or None if parsing fails or time is past.
+    Calculate reminder time (5 minutes before session start).
+    
+    Parses the session string and returns a datetime 5 minutes before the
+    session starts, for sending "session starting soon" notifications.
+    Returns None if the reminder time is in the past or parsing fails.
+    
+    Args:
+        session_str (str): Session description string.
+    
+    Returns:
+        datetime or None: Reminder datetime (start - 5 minutes), or None if
+            parsing fails or time is in the past.
     """
     parts = session_str.split(',')
     if len(parts) != 2:
@@ -157,9 +193,18 @@ def parse_session_to_reminder(session_str):
 
 def parse_session_to_end_reminder(session_str):
     """
-    Parse the session string to extract the end reminder time (5 minutes before end).
-    Assumes format like '12-2pm, Saturday 4th October'.
-    Returns a datetime object for the end reminder, or None if parsing fails or time is past.
+    Calculate end reminder time (5 minutes before session ends).
+    
+    Parses the session string and returns a datetime 5 minutes before the
+    session ends, for sending "session ending soon" notifications.
+    Returns None if the reminder time is in the past or parsing fails.
+    
+    Args:
+        session_str (str): Session description string.
+    
+    Returns:
+        datetime or None: End reminder datetime (end - 5 minutes), or None if
+            parsing fails or time is in the past.
     """
     parts = session_str.split(',')
     if len(parts) != 2:
@@ -203,9 +248,16 @@ def parse_session_to_end_reminder(session_str):
 
 def parse_session_end_date(session_str):
     """
-    Parse the session string to extract the end datetime.
-    Assumes format like '12-2pm, Saturday 4th October'.
-    Returns a datetime object for the end time, or None if parsing fails.
+    Parse session string to extract end datetime.
+    
+    Extracts the end time from the session string for scheduling end-of-session
+    notifications and calculating session duration.
+    
+    Args:
+        session_str (str): Session description string.
+    
+    Returns:
+        datetime or None: End datetime of the session, or None if parsing fails.
     """
     parts = session_str.split(',')
     if len(parts) != 2:

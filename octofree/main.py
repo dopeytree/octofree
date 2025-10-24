@@ -1,3 +1,26 @@
+"""
+Octofree - Octopus Energy Free Electricity Session Monitor
+
+Main application module that orchestrates session scraping, scheduling,
+and Discord notifications for Octopus Energy's free electricity sessions.
+
+Functionality:
+- Scrapes octopus.energy/free-electricity/ website hourly
+- Optionally scrapes X.com (Twitter) at 11am and 8pm
+- Detects new sessions and sends Discord notifications
+- Manages session queue with support for multiple concurrent sessions
+- Sends reminder notifications (5 min before start/end)
+- Tracks session history to prevent duplicate notifications
+
+Environment Variables:
+- DISCORD_WEBHOOK_URL: Discord webhook for notifications
+- TEST_MODE: Enable test mode (resets notification flags)
+- SINGLE_RUN: Run once and exit (vs. continuous loop)
+- OUTPUT_DIR: Directory for data files (default: ./output)
+- BEARER_TOKEN: Optional X.com API bearer token
+- TEST_X_SCRAPER: Force X.com scraper to run (testing only)
+"""
+
 import time
 import os
 import logging
@@ -32,6 +55,7 @@ logging.basicConfig(
 )
 
 def _log_loaded_settings():
+    """Log current configuration settings for debugging."""
     logging.info("Loaded settings:")
     logging.info(f"  DISCORD_WEBHOOK_URL={os.getenv('DISCORD_WEBHOOK_URL')}")
     logging.info(f"  TEST_MODE={os.getenv('TEST_MODE')}")
@@ -42,10 +66,17 @@ _log_loaded_settings()
 
 def should_check_x():
     """
-    Check if current time is during scheduled X.com check windows.
-    Returns True at 11am or 8pm (UTC or local time based on system).
-    Allows a 1-hour window for each check to avoid missing if script runs slightly off-time.
-    Can be overridden by setting TEST_X_SCRAPER=true for testing.
+    Determine if X.com scraper should run based on current time.
+    
+    X.com scraper is configured to run during specific time windows:
+    - 11:00-11:59 (11am window)
+    - 20:00-20:59 (8pm window)
+    
+    This reduces API usage while still catching announcements that typically
+    happen at these times. Can be overridden with TEST_X_SCRAPER=true.
+    
+    Returns:
+        bool: True if current hour is 11 or 20, or if TEST_X_SCRAPER is set.
     """
     # Allow override for testing
     if os.getenv('TEST_X_SCRAPER', '').strip().lower() == 'true':
@@ -57,6 +88,22 @@ def should_check_x():
     return hour == 11 or hour == 20
 
 def main():
+    """
+    Main application loop for Octofree session monitoring.
+    
+    Workflow:
+    1. Run startup validation on historical data
+    2. Scrape octopus.energy website for sessions
+    3. Optionally scrape X.com during scheduled windows (11am, 8pm)
+    4. Compare extracted sessions with previous run
+    5. Detect new sessions and add to queue
+    6. Send initial notifications for new "next" sessions
+    7. Check for and send reminder notifications
+    8. Sleep 1 hour and repeat (unless SINGLE_RUN mode)
+    
+    Supports TEST_MODE for testing notifications without waiting for real sessions.
+    Handles multiple concurrent sessions announced within 48 hours.
+    """
     url = 'https://octopus.energy/free-electricity/'
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
@@ -153,22 +200,22 @@ def main():
                 
                 # Process each extracted session
                 for session_str in current_sessions:
-                    # Check if already in scheduled or past
-                    if session_str in tracked_session_strings:
-                        logging.debug(f"Session already in scheduled: {session_str}")
-                        continue
-                    
-                    if session_str in past_session_strings:
-                        logging.debug(f"Session already in past: {session_str}")
-                        continue
-                    
-                    # In TEST_MODE, allow reprocessing by resetting flags
+                    # In TEST_MODE, allow reprocessing by resetting flags BEFORE checking if tracked
                     if test_mode and session_str in tracked_session_strings:
                         logging.info(f"[TEST_MODE] Resetting notification flags for: {session_str}")
                         existing = next(s for s in scheduled_sessions if s['session'] == session_str)
                         existing['notified'] = False
                         existing['reminder_sent'] = False
                         existing['end_sent'] = False
+                        continue  # Skip adding duplicate, but flags are reset for re-notification
+                    
+                    # Check if already in scheduled or past (skip in normal mode)
+                    if session_str in tracked_session_strings:
+                        logging.debug(f"Session already in scheduled: {session_str}")
+                        continue
+                    
+                    if session_str in past_session_strings:
+                        logging.debug(f"Session already in past: {session_str}")
                         continue
                     
                     # Parse times
