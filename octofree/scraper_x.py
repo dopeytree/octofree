@@ -1,3 +1,18 @@
+"""
+X.com (Twitter) scraper for Octopus Energy free electricity sessions.
+
+This module provides optional supplementary scraping of the @savingsessions
+X.com (Twitter) account to catch session announcements that might be made
+on social media before the website is updated.
+
+Runs during scheduled windows (11am and 8pm) to minimize API usage.
+Requires BEARER_TOKEN environment variable for X.com API v2 access.
+
+The scraper searches for recent tweets from @savingsessions with the
+#savingsessions hashtag and extracts session information using the same
+regex patterns as the website scraper.
+"""
+
 import re
 import logging
 import os
@@ -8,21 +23,78 @@ load_dotenv('settings.env')
 
 def bearer_oauth(r):
     """
-    Method required by bearer token authentication.
+    Add bearer token authentication to X.com API request.
+    
+    Required authentication method for X.com API v2. Adds Authorization
+    header with bearer token from BEARER_TOKEN environment variable.
+    
+    Args:
+        r: requests.Request object to add authentication headers to.
+    
+    Returns:
+        Modified request object with authentication headers.
+    
+    Raises:
+        ValueError: If BEARER_TOKEN is not set or is empty.
     """
     bearer_token = os.getenv('BEARER_TOKEN')
+    if not bearer_token:
+        raise ValueError(
+            "BEARER_TOKEN environment variable is not set or is empty. "
+            "X.com scraper requires a valid bearer token. "
+            "Set BEARER_TOKEN in settings.env or disable X.com scraping."
+        )
     r.headers["Authorization"] = f"Bearer {bearer_token}"
     r.headers["User-Agent"] = "v2RecentSearchPython"
     return r
 
 def connect_to_endpoint(url, params):
-    response = requests.request("GET", url, auth=bearer_oauth, params=params, timeout=30)
-    if response.status_code != 200:
-        logging.error(f"Request returned an error: {response.status_code} {response.text}")
+    """
+    Connect to X.com API endpoint and return JSON response.
+    
+    Makes authenticated GET request to X.com API v2 endpoint.
+    
+    Args:
+        url (str): X.com API endpoint URL.
+        params (dict): Query parameters for the request.
+    
+    Returns:
+        dict or None: Parsed JSON response, or None if request fails.
+            Logs error details on failure.
+    """
+    try:
+        response = requests.request("GET", url, auth=bearer_oauth, params=params, timeout=30)
+        response.raise_for_status()  # Raise exception for non-2xx status codes
+        return response.json()
+    except requests.RequestException as e:
+        logging.error(f"[SCRAPER_X] Request to {url} failed: {e}")
         return None
-    return response.json()
+    except (ValueError, KeyError) as e:
+        # Catch JSON decode errors and other parsing issues
+        response_preview = response.text[:200] if hasattr(response, 'text') else "N/A"
+        status_code = response.status_code if hasattr(response, 'status_code') else "N/A"
+        logging.exception(
+            f"[SCRAPER_X] Failed to parse JSON response from {url}. "
+            f"Status: {status_code}, Response preview: {response_preview}..."
+        )
+        return None
 
 def fetch_tweets_with_hashtag():
+    """
+    Fetch recent tweets from @savingsessions account.
+    
+    Searches for recent tweets (last 7 days) from the @savingsessions
+    account containing #savingsessions hashtag. Returns up to 2 most
+    recent matching tweets.
+    
+    Requires BEARER_TOKEN environment variable to be set for API access.
+    
+    Returns:
+        list: List of tweet text strings (up to 2), or empty list if:
+            - BEARER_TOKEN not configured
+            - API request fails
+            - No matching tweets found
+    """
     bearer_token = os.getenv('BEARER_TOKEN')
     if not bearer_token:
         logging.error("BEARER_TOKEN not set in environment variables.")
@@ -44,6 +116,21 @@ def fetch_tweets_with_hashtag():
         return []
 
 def extract_sessions_from_tweets(tweet_texts):
+    """
+    Extract session information from tweet text content.
+    
+    Uses the same regex pattern as website scraper to find session strings
+    in tweet text. Handles various formats including standard and special
+    session announcements.
+    
+    Args:
+        tweet_texts (list): List of tweet text strings to parse.
+    
+    Returns:
+        tuple: (session_type, sessions)
+            - session_type (str): Always 'next' (assumes tweets announce upcoming sessions)
+            - sessions (list): Deduplicated list of extracted session strings
+    """
     sessions = []
     for text in tweet_texts:
         # Look for patterns like time-date in the tweet
@@ -55,6 +142,17 @@ def extract_sessions_from_tweets(tweet_texts):
     return 'next', sessions  # Assume they are next sessions
 
 def fetch_and_extract_sessions():
+    """
+    Main entry point for X.com scraping - fetch tweets and extract sessions.
+    
+    Combines tweet fetching and session extraction into single operation.
+    Called from main.py during scheduled X.com check windows (11am, 8pm).
+    
+    Returns:
+        tuple: (session_type, sessions)
+            - session_type (str): Type of sessions found ('next')
+            - sessions (list): List of session strings extracted from tweets
+    """
     tweet_texts = fetch_tweets_with_hashtag()
     session_type, sessions = extract_sessions_from_tweets(tweet_texts)
     return session_type, sessions

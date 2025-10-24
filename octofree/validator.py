@@ -1,9 +1,18 @@
 """
-Data Validation and Correction Module
+Data Validation and Correction Module for Octofree.
 
 This module validates and corrects previously saved session data to ensure
 that any fixes to parsing logic are also applied to historical data.
 Runs on container startup to maintain data integrity.
+
+Functions validate:
+- Session time parsing accuracy
+- Duration reasonableness (detects > 4 hour sessions)
+- Start/end time consistency with session strings
+- AM/PM inference correctness
+
+When errors are detected, sessions are automatically corrected using current
+parsing logic and changes are logged for audit purposes.
 """
 
 import logging
@@ -15,10 +24,22 @@ from utils import parse_session_date, parse_session_to_reminder, parse_session_t
 
 def validate_session_times(session_data: Dict) -> Tuple[bool, List[str]]:
     """
-    Validate that session times are correctly parsed.
+    Validate that session times are correctly parsed against the session string.
+    
+    Performs comprehensive validation including:
+    - Checks duration is reasonable (0-4 hours typically)
+    - Verifies end time is after start time
+    - Compares parsed times against session string format
+    - Validates AM/PM inference matches expected values
+    
+    Args:
+        session_data (Dict): Session dictionary containing 'session' string,
+            'start_time', and 'end_time' ISO format strings.
     
     Returns:
-        Tuple of (is_valid, list_of_errors)
+        Tuple[bool, List[str]]: (is_valid, list_of_errors)
+            - is_valid: True if no errors found, False otherwise
+            - list_of_errors: Descriptions of any validation failures
     """
     errors = []
     session_str = session_data.get('session', '')
@@ -92,10 +113,17 @@ def validate_session_times(session_data: Dict) -> Tuple[bool, List[str]]:
 
 def correct_session_data(session_data: Dict) -> Dict:
     """
-    Correct session data by re-parsing the session string with current logic.
+    Correct session data by re-parsing with current (fixed) logic.
+    
+    Takes a session dictionary that failed validation and re-parses all
+    datetime fields using the current parsing functions from utils.py.
+    This ensures historical data benefits from any bug fixes in parsing logic.
+    
+    Args:
+        session_data (Dict): Session dictionary with potentially incorrect times.
     
     Returns:
-        Corrected session data dictionary
+        Dict: Corrected session dictionary with re-parsed datetime values.
     """
     session_str = session_data['session']
     
@@ -122,7 +150,16 @@ def correct_session_data(session_data: Dict) -> Dict:
 
 def log_correction_details(session_str: str, old_data: Dict, new_data: Dict, errors: List[str]):
     """
-    Log detailed information about what was corrected.
+    Log detailed information about session data corrections.
+    
+    Provides comprehensive audit trail of what was corrected and why,
+    including before/after timestamps and duration calculations.
+    
+    Args:
+        session_str (str): Session description string.
+        old_data (Dict): Original (incorrect) session data.
+        new_data (Dict): Corrected session data.
+        errors (List[str]): List of validation errors that triggered correction.
     """
     logging.warning(f"🔧 CORRECTING SESSION DATA: '{session_str}'")
     logging.warning(f"   Errors found: {len(errors)}")
@@ -141,10 +178,20 @@ def log_correction_details(session_str: str, old_data: Dict, new_data: Dict, err
 
 def validate_and_correct_sessions_file(file_path: str, file_description: str) -> bool:
     """
-    Validate and correct a sessions JSON file.
+    Validate and correct a sessions JSON file (scheduled or past).
+    
+    Loads the file, validates each session, corrects any errors found,
+    and saves back to disk if corrections were made. Provides detailed
+    logging of all validation and correction activities.
+    
+    Args:
+        file_path (str): Absolute path to the JSON file to validate.
+        file_description (str): Human-readable description for logging
+            (e.g., "Scheduled Sessions", "Past Scheduled Sessions").
     
     Returns:
-        True if corrections were made, False otherwise
+        bool: True if corrections were made, False if all data was valid
+            or file doesn't exist.
     """
     try:
         # Load the file
@@ -202,10 +249,17 @@ def validate_and_correct_sessions_file(file_path: str, file_description: str) ->
 
 def validate_and_correct_extracted_sessions(file_path: str) -> bool:
     """
-    Validate extracted sessions file (simpler format - just strings).
+    Validate last_extracted_sessions.json file format.
+    
+    Simpler validation than full session validation since this file only
+    contains a list of session strings (not full session objects with times).
+    Ensures file is a proper JSON list of non-empty strings.
+    
+    Args:
+        file_path (str): Path to last_extracted_sessions.json file.
     
     Returns:
-        True if file is valid, False otherwise
+        bool: True if valid, False if format is incorrect.
     """
     try:
         with open(file_path, 'r') as f:
@@ -237,8 +291,23 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     """
     Run validation and correction on all session files at startup.
     
+    This is the main entry point called from main.py during application startup.
+    Validates and corrects:
+    - scheduled_sessions.json
+    - past_scheduled_sessions.json  
+    - last_extracted_sessions.json
+    
+    Provides comprehensive logging with visual separators and summary.
+    Ensures all historical data is consistent with current parsing logic.
+    
+    Args:
+        output_dir (str): Absolute path to directory containing session files.
+    
     Returns:
-        Dictionary with results for each file
+        Dict[str, bool]: Results dictionary with keys:
+            - 'scheduled': True if corrections made to scheduled_sessions.json
+            - 'past': True if corrections made to past_scheduled_sessions.json
+            - 'extracted': True if last_extracted_sessions.json is valid
     """
     import os
     

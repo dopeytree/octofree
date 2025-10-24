@@ -1,3 +1,16 @@
+"""
+Discord notification module for Octofree.
+
+This module handles sending Discord webhook notifications for various session
+events including:
+- Initial session announcements (when first detected)
+- 5-minute reminder before session starts
+- 5-minute reminder before session ends
+- Moving completed sessions to past history
+
+Manages notification state tracking to prevent duplicate messages.
+"""
+
 import requests
 import os
 import logging
@@ -9,6 +22,21 @@ from utils import parse_session_date, parse_session_to_reminder, parse_session_t
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL')
 
 def send_discord_notification(message, notification_type="general"):
+    """
+    Send a notification message to Discord via webhook.
+    
+    Uses the DISCORD_WEBHOOK_URL environment variable to post messages.
+    All messages are sent with the username "🐙 Octopus - Free Electric!!! ⚡️".
+    
+    Args:
+        message (str): The notification message content to send.
+        notification_type (str, optional): Type of notification for logging.
+            Common types: "general", "date_time", "5min_delta", "end_state".
+            Defaults to "general".
+    
+    Returns:
+        None. Logs success or error.
+    """
     if not DISCORD_WEBHOOK_URL:
         logging.error("ERROR: DISCORD_WEBHOOK_URL environment variable must be set.")
         return
@@ -25,6 +53,22 @@ def send_discord_notification(message, notification_type="general"):
 active_timers = []  # Global list to keep references to active timers
 
 def check_and_send_notifications():
+    """
+    Check scheduled sessions and send time-based notifications.
+    
+    This function is called regularly (every hour) to check if any notifications
+    need to be sent. For each scheduled session, it:
+    1. Sends initial notification if not yet sent
+    2. Sends 5-minute warning before start (if reminder_time reached)
+    3. Sends 5-minute warning before end (if end_reminder_time reached)
+    4. Moves session to past_sessions when end_time is reached
+    
+    Updates notification flags (notified, reminder_sent, end_sent) to prevent
+    duplicate notifications. All state changes are persisted to JSON files.
+    
+    Returns:
+        None. Modifies scheduled_sessions and past_sessions files.
+    """
     # Load scheduled sessions
     scheduled_sessions = load_scheduled_sessions()
     past_sessions = load_past_scheduled_sessions()

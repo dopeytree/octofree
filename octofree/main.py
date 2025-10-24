@@ -1,3 +1,26 @@
+"""
+Octofree - Octopus Energy Free Electricity Session Monitor
+
+Main application module that orchestrates session scraping, scheduling,
+and Discord notifications for Octopus Energy's free electricity sessions.
+
+Functionality:
+- Scrapes octopus.energy/free-electricity/ website hourly
+- Optionally scrapes X.com (Twitter) at 11am and 8pm
+- Detects new sessions and sends Discord notifications
+- Manages session queue with support for multiple concurrent sessions
+- Sends reminder notifications (5 min before start/end)
+- Tracks session history to prevent duplicate notifications
+
+Environment Variables:
+- DISCORD_WEBHOOK_URL: Discord webhook for notifications
+- TEST_MODE: Enable test mode (resets notification flags)
+- SINGLE_RUN: Run once and exit (vs. continuous loop)
+- OUTPUT_DIR: Directory for data files (default: ./output)
+- BEARER_TOKEN: Optional X.com API bearer token
+- TEST_X_SCRAPER: Force X.com scraper to run (testing only)
+"""
+
 import time
 import os
 import logging
@@ -32,8 +55,14 @@ logging.basicConfig(
 )
 
 def _log_loaded_settings():
+    """Log current configuration settings for debugging."""
     logging.info("Loaded settings:")
-    logging.info(f"  DISCORD_WEBHOOK_URL={os.getenv('DISCORD_WEBHOOK_URL')}")
+    # Mask webhook URL for security - never log the full URL
+    webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
+    if webhook_url:
+        logging.info(f"  DISCORD_WEBHOOK_URL=SET (length: {len(webhook_url)} chars)")
+    else:
+        logging.info("  DISCORD_WEBHOOK_URL=NOT SET")
     logging.info(f"  TEST_MODE={os.getenv('TEST_MODE')}")
     logging.info(f"  SINGLE_RUN={os.getenv('SINGLE_RUN')}")
     logging.info(f"  OUTPUT_DIR={output_dir}")
@@ -42,10 +71,17 @@ _log_loaded_settings()
 
 def should_check_x():
     """
-    Check if current time is during scheduled X.com check windows.
-    Returns True at 11am or 8pm (UTC or local time based on system).
-    Allows a 1-hour window for each check to avoid missing if script runs slightly off-time.
-    Can be overridden by setting TEST_X_SCRAPER=true for testing.
+    Determine if X.com scraper should run based on current time.
+    
+    X.com scraper is configured to run during specific time windows:
+    - 11:00-11:59 (11am window)
+    - 20:00-20:59 (8pm window)
+    
+    This reduces API usage while still catching announcements that typically
+    happen at these times. Can be overridden with TEST_X_SCRAPER=true.
+    
+    Returns:
+        bool: True if current hour is 11 or 20, or if TEST_X_SCRAPER is set.
     """
     # Allow override for testing
     if os.getenv('TEST_X_SCRAPER', '').strip().lower() == 'true':
@@ -57,6 +93,22 @@ def should_check_x():
     return hour == 11 or hour == 20
 
 def main():
+    """
+    Main application loop for Octofree session monitoring.
+    
+    Workflow:
+    1. Run startup validation on historical data
+    2. Scrape octopus.energy website for sessions
+    3. Optionally scrape X.com during scheduled windows (11am, 8pm)
+    4. Compare extracted sessions with previous run
+    5. Detect new sessions and add to queue
+    6. Send initial notifications for new "next" sessions
+    7. Check for and send reminder notifications
+    8. Sleep 1 hour and repeat (unless SINGLE_RUN mode)
+    
+    Supports TEST_MODE for testing notifications without waiting for real sessions.
+    Handles multiple concurrent sessions announced within 48 hours.
+    """
     url = 'https://octopus.energy/free-electricity/'
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
@@ -127,30 +179,48 @@ def main():
             
             # Check if sessions are the same as last time
             last_sessions = load_last_extracted_sessions()
-            if set(current_sessions) == set(last_sessions) and not test_mode:
+            
+            # Compare sets to see if there are any new sessions
+            current_set = set(current_sessions)
+            last_set = set(last_sessions)
+            new_sessions = current_set - last_set
+            
+            if not new_sessions and not test_mode:
                 logging.info("No new session planned")
             else:
-                if test_mode and set(current_sessions) == set(last_sessions):
+                if test_mode and not new_sessions:
                     logging.info("[TEST_MODE] Sessions unchanged, but will process anyway for testing")
+                elif new_sessions:
+                    logging.info(f"New session(s) detected: {list(new_sessions)}")
+                
                 # Load existing scheduled sessions
                 scheduled_sessions = load_scheduled_sessions()
                 past_sessions = load_past_scheduled_sessions()
                 
+                # Get list of already tracked session strings for quick lookup
+                tracked_session_strings = set(s['session'] for s in scheduled_sessions)
+                past_session_strings = set(s['session'] for s in past_sessions)
+                
+                sessions_added = []
+                
                 # Process each extracted session
                 for session_str in current_sessions:
-                    # Check if already in scheduled or past
-                    existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
-                    past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
-                    
-                    # In TEST_MODE, reset notification flags to allow testing
-                    if test_mode and existing:
-                        logging.info(f"[TEST_MODE] Resetting notification flags for existing session: {session_str}")
+                    # In TEST_MODE, allow reprocessing by resetting flags BEFORE checking if tracked
+                    if test_mode and session_str in tracked_session_strings:
+                        logging.info(f"[TEST_MODE] Resetting notification flags for: {session_str}")
+                        existing = next(s for s in scheduled_sessions if s['session'] == session_str)
                         existing['notified'] = False
                         existing['reminder_sent'] = False
                         existing['end_sent'] = False
-                        # Don't skip - continue processing to send notification
-                    elif existing or past_existing:
-                        logging.info(f"Session already tracked: {session_str}")
+                        continue  # Skip adding duplicate, but flags are reset for re-notification
+                    
+                    # Check if already in scheduled or past (skip in normal mode)
+                    if session_str in tracked_session_strings:
+                        logging.debug(f"Session already in scheduled: {session_str}")
+                        continue
+                    
+                    if session_str in past_session_strings:
+                        logging.debug(f"Session already in past: {session_str}")
                         continue
                     
                     # Parse times
@@ -189,9 +259,11 @@ def main():
                         'end_sent': False
                     }
                     
-                    # Add to scheduled
+                    # Add to scheduled and track
                     scheduled_sessions.append(session_data)
-                    logging.info(f"Added new session: {session_str}")
+                    tracked_session_strings.add(session_str)
+                    sessions_added.append(session_str)
+                    logging.info(f"✓ Added new session to queue: {session_str}")
                     
                     # Send initial notification for upcoming sessions OR if in TEST_MODE
                     if is_next or test_mode:
@@ -206,7 +278,7 @@ def main():
                         if test_mode:
                             logging.info(f"[TEST_MODE] Initial notification sent for {session_str}")
                         else:
-                            logging.info(f"Initial notification sent for {session_str}")
+                            logging.info(f"✓ Initial notification sent for {session_str}")
                     else:
                         logging.info(f"Skipped notification for {session_str} (type: {session_type}, test_mode: {test_mode})")
                     
@@ -217,11 +289,17 @@ def main():
                 save_scheduled_sessions(scheduled_sessions)
                 save_past_scheduled_sessions(past_sessions)
                 
+                # Log summary
+                if sessions_added:
+                    logging.info(f"✓ Session queue updated: {len(sessions_added)} session(s) added")
+                    logging.info(f"✓ Total queued sessions: {len(scheduled_sessions)}")
+                
                 # Check and send notifications (reminders, end states)
                 check_and_send_notifications()
             
-            # Always save current sessions as last extracted
+            # Always save current sessions as last extracted (after processing)
             save_last_extracted_sessions(current_sessions)
+            logging.debug(f"[STORAGE] Updated last_extracted_sessions.json with {len(current_sessions)} session(s)")
         
         else:
             logging.error("Failed to fetch HTML content.")
