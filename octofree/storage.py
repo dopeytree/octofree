@@ -57,13 +57,13 @@ def load_scheduled_sessions():
                     for i, session in enumerate(sessions):
                         # Defensive validation: ensure entry is a dict with 'session' key
                         if not isinstance(session, dict):
-                            logging.debug(f"[STORAGE] Skipping malformed entry at index {i}: not a dict")
+                            logging.debug(f"🔍 [STORAGE] Skipping malformed entry at index {i}: not a dict")
                             malformed_count += 1
                             continue
                         
                         session_str = session.get('session', '')
                         if not session_str or not isinstance(session_str, str):
-                            logging.debug(f"[STORAGE] Skipping entry at index {i}: missing or invalid 'session' key")
+                            logging.debug(f"🔍 [STORAGE] Skipping entry at index {i}: missing or invalid 'session' key")
                             malformed_count += 1
                             continue
                         
@@ -72,18 +72,18 @@ def load_scheduled_sessions():
                             seen.add(session_str)
                             unique_sessions.append(session)
                         else:
-                            logging.debug(f"[STORAGE] Removing duplicate session during load: {session_str}")
+                            logging.debug(f"🔍 [STORAGE] Removing duplicate session during load: {session_str}")
                     
                     # Log summary of cleanup
                     duplicates_removed = len(sessions) - len(unique_sessions) - malformed_count
                     if malformed_count > 0:
-                        logging.warning(f"[STORAGE] Removed {malformed_count} malformed entry/entries from scheduled_sessions.json")
+                        logging.warning(f"⚠️ [STORAGE] Removed {malformed_count} malformed entry/entries from scheduled_sessions.json")
                     if duplicates_removed > 0:
-                        logging.warning(f"[STORAGE] Deduplicated {duplicates_removed} duplicate session(s) from scheduled_sessions.json")
+                        logging.warning(f"⚠️ [STORAGE] Deduplicated {duplicates_removed} duplicate session(s) from scheduled_sessions.json")
                     
                     return unique_sessions
             except (json.JSONDecodeError, ValueError) as e:
-                logging.warning(f"Invalid or empty JSON in {SCHEDULED_SESSIONS_FILE}: {e}. Treating as empty.")
+                logging.warning(f"⚠️ [STORAGE] Invalid or empty JSON in {SCHEDULED_SESSIONS_FILE}: {e}. Treating as empty.")
                 return []
     return []
 
@@ -126,13 +126,13 @@ def load_past_scheduled_sessions():
                     for i, session in enumerate(sessions):
                         # Defensive validation: ensure entry is a dict with 'session' key
                         if not isinstance(session, dict):
-                            logging.debug(f"[STORAGE] Skipping malformed entry at index {i} in past sessions: not a dict")
+                            logging.debug(f"🔍 [STORAGE] Skipping malformed entry at index {i} in past sessions: not a dict")
                             malformed_count += 1
                             continue
                         
                         session_str = session.get('session', '')
                         if not session_str or not isinstance(session_str, str):
-                            logging.debug(f"[STORAGE] Skipping entry at index {i} in past sessions: missing or invalid 'session' key")
+                            logging.debug(f"🔍 [STORAGE] Skipping entry at index {i} in past sessions: missing or invalid 'session' key")
                             malformed_count += 1
                             continue
                         
@@ -141,18 +141,18 @@ def load_past_scheduled_sessions():
                             seen.add(session_str)
                             unique_sessions.append(session)
                         else:
-                            logging.debug(f"[STORAGE] Removing duplicate past session during load: {session_str}")
+                            logging.debug(f"🔍 [STORAGE] Removing duplicate past session during load: {session_str}")
                     
                     # Log summary of cleanup
                     duplicates_removed = len(sessions) - len(unique_sessions) - malformed_count
                     if malformed_count > 0:
-                        logging.warning(f"[STORAGE] Removed {malformed_count} malformed entry/entries from past_scheduled_sessions.json")
+                        logging.warning(f"⚠️ [STORAGE] Removed {malformed_count} malformed entry/entries from past_scheduled_sessions.json")
                     if duplicates_removed > 0:
-                        logging.warning(f"[STORAGE] Deduplicated {duplicates_removed} duplicate past session(s) from past_scheduled_sessions.json")
+                        logging.warning(f"⚠️ [STORAGE] Deduplicated {duplicates_removed} duplicate past session(s) from past_scheduled_sessions.json")
                     
                     return unique_sessions
             except (json.JSONDecodeError, ValueError) as e:
-                logging.warning(f"Invalid or empty JSON in {PAST_SCHEDULED_SESSIONS_FILE}: {e}. Treating as empty.")
+                logging.warning(f"⚠️ [STORAGE] Invalid or empty JSON in {PAST_SCHEDULED_SESSIONS_FILE}: {e}. Treating as empty.")
                 return []
     return []
 
@@ -239,7 +239,7 @@ def load_last_extracted_sessions():
                     
                     # Validate that it's a list of strings
                     if not isinstance(sessions, list):
-                        logging.warning(f"[STORAGE] {LAST_EXTRACTED_SESSIONS_FILE} is not a list. Treating as empty.")
+                        logging.warning(f"⚠️ [STORAGE] {LAST_EXTRACTED_SESSIONS_FILE} is not a list. Treating as empty.")
                         return []
                     
                     # Filter and validate entries
@@ -248,14 +248,14 @@ def load_last_extracted_sessions():
                         if isinstance(session, str) and session.strip():
                             valid_sessions.append(session)
                         else:
-                            logging.debug(f"[STORAGE] Skipping invalid entry at index {i} in last_extracted_sessions: {type(session).__name__}")
+                            logging.debug(f"🔍 [STORAGE] Skipping invalid entry at index {i} in last_extracted_sessions: {type(session).__name__}")
                     
                     if len(valid_sessions) < len(sessions):
-                        logging.warning(f"[STORAGE] Removed {len(sessions) - len(valid_sessions)} invalid entry/entries from last_extracted_sessions.json")
+                        logging.warning(f"⚠️ [STORAGE] Removed {len(sessions) - len(valid_sessions)} invalid entry/entries from last_extracted_sessions.json")
                     
                     return valid_sessions
             except (json.JSONDecodeError, ValueError) as e:
-                logging.warning(f"Invalid or empty JSON in {LAST_EXTRACTED_SESSIONS_FILE}: {e}. Treating as empty.")
+                logging.warning(f"⚠️ [STORAGE] Invalid or empty JSON in {LAST_EXTRACTED_SESSIONS_FILE}: {e}. Treating as empty.")
                 return []
     return []
 
@@ -303,7 +303,7 @@ def log_x_scraper_data(website_sessions, x_sessions, new_sessions_found):
             with open(X_SCRAPER_LOG, 'r') as f:
                 log_entries = json.load(f)
         except (json.JSONDecodeError, ValueError):
-            logging.warning(f"Invalid JSON in {X_SCRAPER_LOG}. Starting fresh.")
+            logging.warning(f"⚠️ [STORAGE] Invalid JSON in {X_SCRAPER_LOG}. Starting fresh.")
             log_entries = []
     
     # Add new entry
@@ -317,4 +317,4 @@ def log_x_scraper_data(website_sessions, x_sessions, new_sessions_found):
         with open(X_SCRAPER_LOG, 'w') as f:
             json.dump(log_entries, f, indent=2, default=str)
     
-    logging.debug(f"[SCRAPER_X] Logged activity to {X_SCRAPER_LOG}")
+    logging.debug(f"🔍 [X SCRAPER] Logged activity to {X_SCRAPER_LOG}")

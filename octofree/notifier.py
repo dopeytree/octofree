@@ -46,7 +46,7 @@ def send_discord_notification(message, notification_type="general"):
     }
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data, timeout=10)
-        logging.info(f"{notification_type} notification sent successfully: {message}")
+        logging.info(f"📤 {notification_type} notification sent successfully: {message}")
     except Exception as e:
         logging.error(f"Error sending notification: {e}")
 
@@ -92,7 +92,7 @@ def check_and_send_notifications():
             )
             send_discord_notification(message, "date_time")
             session['notified'] = True
-            logging.info(f"Initial notification sent for {session_str}")
+            logging.info(f"📣 INITIAL ALERT: {session_str}")
         
         # Check for reminder (only if reminder_time is set)
         if session['reminder_time'] and not session['reminder_sent']:
@@ -101,7 +101,7 @@ def check_and_send_notifications():
                 message = f"📣 T-5mins to Delta! {session_str}"
                 send_discord_notification(message, "5min_delta")
                 session['reminder_sent'] = True
-                logging.info(f"Reminder sent for {session_str}")
+                logging.info(f"⏰ REMINDER SENT: {session_str} (5 mins before start)")
         
         # Check for end reminder (only if end_reminder_time is set)
         if session['end_reminder_time'] and not session['end_sent']:
@@ -110,13 +110,13 @@ def check_and_send_notifications():
                 message = f"🐰 End State: {session_str}"
                 send_discord_notification(message, "end_state")
                 session['end_sent'] = True
-                logging.info(f"End reminder sent for {session_str}")
+                logging.info(f"🏁 END REMINDER SENT: {session_str} (5 mins before end)")
         
         # Move to past if ended
         if end_time <= now:
             past_sessions.append(session)
             scheduled_sessions.remove(session)
-            logging.info(f"Moved {session_str} to past sessions")
+            logging.info(f"✅ SESSION COMPLETED: {session_str} → moved to past")
     
     # Save updates
     save_scheduled_sessions(scheduled_sessions)
