@@ -127,30 +127,48 @@ def main():
             
             # Check if sessions are the same as last time
             last_sessions = load_last_extracted_sessions()
-            if set(current_sessions) == set(last_sessions) and not test_mode:
+            
+            # Compare sets to see if there are any new sessions
+            current_set = set(current_sessions)
+            last_set = set(last_sessions)
+            new_sessions = current_set - last_set
+            
+            if not new_sessions and not test_mode:
                 logging.info("No new session planned")
             else:
-                if test_mode and set(current_sessions) == set(last_sessions):
+                if test_mode and not new_sessions:
                     logging.info("[TEST_MODE] Sessions unchanged, but will process anyway for testing")
+                elif new_sessions:
+                    logging.info(f"New session(s) detected: {list(new_sessions)}")
+                
                 # Load existing scheduled sessions
                 scheduled_sessions = load_scheduled_sessions()
                 past_sessions = load_past_scheduled_sessions()
                 
+                # Get list of already tracked session strings for quick lookup
+                tracked_session_strings = set(s['session'] for s in scheduled_sessions)
+                past_session_strings = set(s['session'] for s in past_sessions)
+                
+                sessions_added = []
+                
                 # Process each extracted session
                 for session_str in current_sessions:
                     # Check if already in scheduled or past
-                    existing = next((s for s in scheduled_sessions if s['session'] == session_str), None)
-                    past_existing = next((s for s in past_sessions if s['session'] == session_str), None)
+                    if session_str in tracked_session_strings:
+                        logging.debug(f"Session already in scheduled: {session_str}")
+                        continue
                     
-                    # In TEST_MODE, reset notification flags to allow testing
-                    if test_mode and existing:
-                        logging.info(f"[TEST_MODE] Resetting notification flags for existing session: {session_str}")
+                    if session_str in past_session_strings:
+                        logging.debug(f"Session already in past: {session_str}")
+                        continue
+                    
+                    # In TEST_MODE, allow reprocessing by resetting flags
+                    if test_mode and session_str in tracked_session_strings:
+                        logging.info(f"[TEST_MODE] Resetting notification flags for: {session_str}")
+                        existing = next(s for s in scheduled_sessions if s['session'] == session_str)
                         existing['notified'] = False
                         existing['reminder_sent'] = False
                         existing['end_sent'] = False
-                        # Don't skip - continue processing to send notification
-                    elif existing or past_existing:
-                        logging.info(f"Session already tracked: {session_str}")
                         continue
                     
                     # Parse times
@@ -189,9 +207,11 @@ def main():
                         'end_sent': False
                     }
                     
-                    # Add to scheduled
+                    # Add to scheduled and track
                     scheduled_sessions.append(session_data)
-                    logging.info(f"Added new session: {session_str}")
+                    tracked_session_strings.add(session_str)
+                    sessions_added.append(session_str)
+                    logging.info(f"✓ Added new session to queue: {session_str}")
                     
                     # Send initial notification for upcoming sessions OR if in TEST_MODE
                     if is_next or test_mode:
@@ -206,7 +226,7 @@ def main():
                         if test_mode:
                             logging.info(f"[TEST_MODE] Initial notification sent for {session_str}")
                         else:
-                            logging.info(f"Initial notification sent for {session_str}")
+                            logging.info(f"✓ Initial notification sent for {session_str}")
                     else:
                         logging.info(f"Skipped notification for {session_str} (type: {session_type}, test_mode: {test_mode})")
                     
@@ -217,11 +237,17 @@ def main():
                 save_scheduled_sessions(scheduled_sessions)
                 save_past_scheduled_sessions(past_sessions)
                 
+                # Log summary
+                if sessions_added:
+                    logging.info(f"✓ Session queue updated: {len(sessions_added)} session(s) added")
+                    logging.info(f"✓ Total queued sessions: {len(scheduled_sessions)}")
+                
                 # Check and send notifications (reminders, end states)
                 check_and_send_notifications()
             
-            # Always save current sessions as last extracted
+            # Always save current sessions as last extracted (after processing)
             save_last_extracted_sessions(current_sessions)
+            logging.debug(f"[STORAGE] Updated last_extracted_sessions.json with {len(current_sessions)} session(s)")
         
         else:
             logging.error("Failed to fetch HTML content.")

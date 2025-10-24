@@ -19,7 +19,22 @@ def load_scheduled_sessions():
     if os.path.exists(SCHEDULED_SESSIONS_FILE):
         try:
             with open(SCHEDULED_SESSIONS_FILE, 'r') as f:
-                return json.load(f)
+                sessions = json.load(f)
+                # Deduplicate sessions based on session string
+                seen = set()
+                unique_sessions = []
+                for session in sessions:
+                    session_str = session.get('session', '')
+                    if session_str and session_str not in seen:
+                        seen.add(session_str)
+                        unique_sessions.append(session)
+                    elif session_str in seen:
+                        logging.debug(f"[STORAGE] Removing duplicate session during load: {session_str}")
+                
+                if len(unique_sessions) < len(sessions):
+                    logging.warning(f"[STORAGE] Deduplicated {len(sessions) - len(unique_sessions)} duplicate session(s) from scheduled_sessions.json")
+                
+                return unique_sessions
         except (json.JSONDecodeError, ValueError):
             logging.warning(f"Invalid or empty JSON in {SCHEDULED_SESSIONS_FILE}. Treating as empty.")
             return []
