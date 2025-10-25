@@ -24,6 +24,9 @@ Environment Variables:
 import time
 import os
 import logging
+import threading
+import signal
+import sys
 from scraper_website import fetch_page_content, extract_sessions
 from scraper_x import fetch_and_extract_sessions
 from notifier import check_and_send_notifications, send_discord_notification
@@ -98,23 +101,65 @@ def should_check_x():
     # Check if we're in the 11am window (11:00-11:59) or 8pm window (20:00-20:59)
     return hour == 11 or hour == 20
 
+# Global flag to control reminder thread
+reminder_thread_running = True
+
+def reminder_checker_thread(check_interval=60):
+    """
+    Background thread that checks for reminder notifications every minute.
+    
+    This thread runs independently of the main scraping loop to ensure
+    reminder notifications are sent on time (within 1 minute accuracy).
+    Checks every 60 seconds by default for:
+    - 5-minute warnings before session starts
+    - 5-minute warnings before session ends
+    
+    Args:
+        check_interval (int): Seconds between checks (default: 60)
+    """
+    global reminder_thread_running
+    
+    while reminder_thread_running:
+        try:
+            # Check and send any due reminder notifications
+            check_and_send_notifications()
+        except Exception as e:
+            logging.error(f"❌ Error in reminder checker thread: {e}")
+        
+        # Sleep for the check interval
+        time.sleep(check_interval)
+    
+    logging.info("🔕 Reminder checker thread stopped")
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global reminder_thread_running
+    logging.info(f"🛑 Received signal {signum}, shutting down gracefully...")
+    reminder_thread_running = False
+    sys.exit(0)
+
 def main():
     """
     Main application loop for Octofree session monitoring.
     
     Workflow:
     1. Run startup validation on historical data
-    2. Scrape octopus.energy website for sessions
-    3. Optionally scrape X.com during scheduled windows (11am, 8pm)
-    4. Compare extracted sessions with previous run
-    5. Detect new sessions and add to queue
-    6. Send initial notifications for new "next" sessions
-    7. Check for and send reminder notifications
+    2. Start background reminder checker thread
+    3. Scrape octopus.energy website for sessions
+    4. Optionally scrape X.com during scheduled windows (11am, 8pm)
+    5. Compare extracted sessions with previous run
+    6. Detect new sessions and add to queue
+    7. Send initial notifications for new "next" sessions
     8. Sleep 1 hour and repeat (unless SINGLE_RUN mode)
     
     Supports TEST_MODE for testing notifications without waiting for real sessions.
     Handles multiple concurrent sessions announced within 48 hours.
+    Reminder notifications are handled by a separate background thread that checks every 60 seconds.
     """
+    # Set up signal handlers for graceful shutdown
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
     # Display loading screen at startup
     # NOTE: Animation commented out to avoid log viewer issues
     # try:
@@ -138,6 +183,17 @@ def main():
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
     test_mode = os.getenv('TEST_MODE', '').strip().lower() == 'true'
     x_enabled = bool(os.getenv('BEARER_TOKEN'))
+    
+    # Start background reminder checker thread (unless SINGLE_RUN mode)
+    reminder_thread = None
+    if not single_run:
+        global reminder_thread_running
+        reminder_thread_running = True
+        reminder_thread = threading.Thread(target=reminder_checker_thread, args=(60,), daemon=True)
+        reminder_thread.start()
+        logging.info("✅ Background reminder checker started")
+    else:
+        logging.info("ℹ️  Reminder checker disabled in SINGLE_RUN mode")
     
     # Run startup validation and correction on historical data
     logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
@@ -495,10 +551,8 @@ def main():
                     logging.info(f"  ├─ {len(sessions_added)} sessions added")
                     logging.info(f"  └─ Total queued: {len(scheduled_sessions)}")
             
-            # Check and send notifications (reminders, end states) - EVERY HOUR
-            check_and_send_notifications()
-            
             # Show sent reminder notifications from last 48 hours
+            # Note: Reminder checking now handled by background thread (every 60 seconds)
             logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             now = datetime.now()
             cutoff_time = now - timedelta(hours=48)
@@ -673,7 +727,8 @@ def main():
         
         # Sleep before next iteration
         logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-        logging.info("⏰ Sleeping for 1 hour before next scan...")
+        logging.info("🔔 Reminder checker thread started (checks every 60 seconds)")
+        logging.info("⏳ Sleeping main loop for 1 hour before next scan...")
         logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         time.sleep(3600)
         

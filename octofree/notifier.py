@@ -117,7 +117,7 @@ def check_and_send_notifications():
         if end_time <= now:
             past_sessions.append(session)
             scheduled_sessions.remove(session)
-            logging.info(f"✅ SESSION COMPLETED: {session_str} → moved to past")
+            logging.info(f"🎉 SESSION COMPLETED: {session_str} → moved to past")
     
     # Save updates
     save_scheduled_sessions(scheduled_sessions)
