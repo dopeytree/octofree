@@ -43,7 +43,7 @@ VOLUME ["/data"]
 ENV DISCORD_WEBHOOK_URL=""
 ENV SINGLE_RUN="false"
 ENV TEST_MODE="false"
-ENV OUTPUT_DIR="/app/output"
+ENV OUTPUT_DIR="/data"
 
 # Run your main script (explicitly from /app directory)
 WORKDIR /app

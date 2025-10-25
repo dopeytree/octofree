@@ -63,19 +63,17 @@ logging.basicConfig(
 def _log_loaded_settings():
     """Log current configuration settings for debugging."""
     logging.info("⚙️ LOADING SETTINGS")
-    logging.info("┌───")
     # Mask webhook URL for security - never log the full URL
     webhook_url = os.getenv('DISCORD_WEBHOOK_URL')
     if webhook_url:
-        logging.info(f"│ 🔵 DISCORD_WEBHOOK_URL: SET ({len(webhook_url)} chars)")
+        logging.info(f"  ├── 🔵 DISCORD_WEBHOOK_URL: SET ({len(webhook_url)} chars)")
     else:
-        logging.info("│ 🔴 DISCORD_WEBHOOK_URL: NOT SET")
-    logging.info(f"│ 🔵 TEST_MODE: {os.getenv('TEST_MODE', 'false')}")
-    logging.info(f"│ 🔵 SINGLE_RUN: {os.getenv('SINGLE_RUN', 'false')}")
-    logging.info(f"│ 🔵 OUTPUT_DIR: {output_dir}")
-    logging.info("└───")
+        logging.info("  ├── 🔴 DISCORD_WEBHOOK_URL: NOT SET")
+    logging.info(f"  ├── 🔵 TEST_MODE: {os.getenv('TEST_MODE', 'false')}")
+    logging.info(f"  ├── 🔵 SINGLE_RUN: {os.getenv('SINGLE_RUN', 'false')}")
+    logging.info(f"  └── 🔵 OUTPUT_DIR: {output_dir}")
 
-_log_loaded_settings()
+# Settings will be logged in main() after the loading screen
 
 def should_check_x():
     """
@@ -118,12 +116,23 @@ def main():
     Handles multiple concurrent sessions announced within 48 hours.
     """
     # Display loading screen at startup
-    try:
-        # Try animated loading screen (works in most terminals)
-        display_loading_screen(duration=10.0, steps=40)
-    except Exception:
-        # Fallback to static banner if animation fails (e.g., in some Docker setups)
-        display_static_banner()
+    # NOTE: Animation commented out to avoid log viewer issues
+    # try:
+    #     # Try animated loading screen (works in most terminals)
+    #     display_loading_screen(duration=10.0, steps=40)
+    # except Exception:
+    #     # Fallback to static banner if animation fails (e.g., in some Docker setups)
+    #     display_static_banner()
+    
+    # Use static banner only (no animation)
+    display_static_banner()
+    
+    # Show creator credit
+    logging.info("🌀 Created by Ed Stone (Dopeytree) 2025")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    
+    # Log loaded settings
+    _log_loaded_settings()
     
     url = 'https://octopus.energy/free-electricity/'
     single_run = os.getenv('SINGLE_RUN', '').strip().lower() == 'true'
@@ -131,8 +140,7 @@ def main():
     x_enabled = bool(os.getenv('BEARER_TOKEN'))
     
     # Run startup validation and correction on historical data
-    logging.info("🌀 Created by Ed Stone (Dopeytree) 2025")
-    logging.info("────────────────────────────────────────────────────────────────────")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     try:
         run_startup_validation(output_dir)
     except Exception:
@@ -229,7 +237,7 @@ def main():
             # Summary
             total_stored = len(startup_scheduled_sessions) + len(startup_past_sessions)
             logging.info(f"✅ [STARTUP UPDATE] Bayesian update complete: {len(startup_current_sessions)} on website, {total_stored} total stored ({len(startup_scheduled_sessions)} scheduled, {len(startup_past_sessions)} past)")
-            logging.info("────────────────────────────────────────────────────────────────────")
+            logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             
         else:
             logging.warning("🔴 [STARTUP SCRAPE] Failed to fetch website data for Bayesian update - proceeding with stored data")
@@ -244,7 +252,7 @@ def main():
         logging.info("🔍 SCRAPER STATUS")
         logging.info("  X.com scraper DISABLED (BEARER_TOKEN not configured)")
 
-    logging.info("────────────────────────────────────────────────────────────────────")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
     while True:
         # Fetch from Octopus website (scraper_website - always runs)
@@ -297,13 +305,14 @@ def main():
             logging.debug(f"🔍 [SCRAPER_X] Outside X.com check window (current hour: {datetime.now().hour}). Skipping X.com check.")
         
         # Log summary of what was found
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         logging.info(f"📊 SUMMARY")
         logging.info(f"  ├─ Total unique sessions: {len(current_sessions)}")
         logging.info(f"  ├─ Website: {len(website_sessions)} sessions")
         logging.info(f"  ├─ X.com: {len(x_sessions)} sessions")
         logging.info(f"  └─ New from X: {len(new_x_sessions)} sessions")
         
-        logging.info("────────────────────────────────────────────────────────────────────")
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         # Log mode status (TEST_MODE, SINGLE_RUN)
         if test_mode or single_run:
@@ -314,7 +323,7 @@ def main():
                 logging.info("  └─ All notifications will be sent regardless of prior state")
             if single_run:
                 logging.info("🔸 SINGLE RUN MODE - Will exit after this cycle")
-            logging.info("────────────────────────────────────────────────────────────────────")
+            logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         if current_sessions:
             is_next = (session_type == 'next')
@@ -465,7 +474,7 @@ def main():
             check_and_send_notifications()
             
             # Show final status of upcoming alerts (moved to end for easy visibility)
-            logging.info("────────────────────────────────────────────────────────────────────")
+            logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             final_scheduled_sessions = load_scheduled_sessions()
             if final_scheduled_sessions:
                 now = datetime.now()
@@ -488,7 +497,7 @@ def main():
                     logging.info("✅ All scheduled session reminders have been sent")
             
             # Always save current sessions as last extracted (after processing)
-            logging.info("────────────────────────────────────────────────────────────────────")
+            logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             save_last_extracted_sessions(current_sessions)
             logging.debug(f"💾 [STORAGE] Updated last_extracted_sessions.json with {len(current_sessions)} session(s)")
         
@@ -497,7 +506,17 @@ def main():
         
         if single_run:
             break
+        
+        # Sleep before next iteration
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        logging.info("⏰ Sleeping for 1 hour before next scan...")
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         time.sleep(3600)
+        
+        # New scan cycle starting
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        logging.info("🔄 Starting new scan cycle...")
+        logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 if __name__ == "__main__":
     main()

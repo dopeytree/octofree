@@ -336,7 +336,7 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     import os
     
     logging.info("🚀 STARTING DATA VALIDATION & CORRECTION")
-    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     
     results = {}
     
@@ -359,7 +359,7 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     results['extracted'] = validate_and_correct_extracted_sessions(extracted_path)
     
     # Summary
-    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     if any(results.values()):
         logging.warning("🟡 VALIDATION COMPLETE")
         logging.warning("  ⚠️ Corrections applied to historical data")
@@ -367,6 +367,6 @@ def run_startup_validation(output_dir: str) -> Dict[str, bool]:
     else:
         logging.info("🟢 VALIDATION COMPLETE")
         logging.info("  ✓ All data is correct, no changes needed")
-    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     
     return results
