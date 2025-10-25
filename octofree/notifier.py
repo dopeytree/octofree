@@ -92,6 +92,7 @@ def check_and_send_notifications():
             )
             send_discord_notification(message, "date_time")
             session['notified'] = True
+            update_last_sent_session(session_str)  # Log the notification
             logging.info(f"📣 INITIAL ALERT: {session_str}")
         
         # Check for reminder (only if reminder_time is set)

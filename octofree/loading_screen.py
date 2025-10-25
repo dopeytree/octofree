@@ -151,26 +151,26 @@ def display_loading_screen(duration=4.0, steps=20):
             print("\033[H", end='')
             
             # Display the loading screen with colors
-            print(f"{Colors.CYAN}┌──────────────────────────────────────────────────────────────{Colors.RESET}")
-            print(f"{Colors.CYAN}│{Colors.RESET}                                                              ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╔═══════════════════════════════════════{Colors.RESET}    ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BOLD}{Colors.BRIGHT_MAGENTA}OCTOFREE{Colors.RESET}                      ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}             {Colors.BRIGHT_WHITE}{loading_msg}{Colors.RESET}                     ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}                                       ")
+            print(f"{Colors.CYAN}┌{'─'*99}{Colors.RESET}")
+            print(f"{Colors.CYAN}│{Colors.RESET}{' '*99}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╔{'═'*77}{Colors.RESET}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BOLD}{Colors.BRIGHT_MAGENTA}OCTOFREE{Colors.RESET}{' '*65}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}             {Colors.BRIGHT_WHITE}{loading_msg}{Colors.RESET}{' '*64}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}{' '*77}")
             
             # Octopus with colors
             for idx, line in enumerate(octopus_lines):
                 if idx <= 2:  # Head with eyes
-                    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}{line}{Colors.RESET} ")
+                    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}{line}{Colors.RESET}{' '*35}")
                 else:  # Body and tentacles
-                    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}{line}{Colors.RESET} ")
+                    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}{line}{Colors.RESET}{' '*35}")
             
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}                                       ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.BLACK}[{progress_color}{bar}{Colors.BLACK}]{Colors.RESET} {progress_color}{progress:3d}%{Colors.RESET}       ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╚═══════════════════════════════════════{Colors.RESET}    ")
-            print(f"{Colors.CYAN}│{Colors.RESET}                                                              ")
-            print(f"{Colors.CYAN}│{Colors.RESET}  {Colors.BRIGHT_YELLOW}Free Electricity Sessions{Colors.RESET} {Colors.BLACK}Powered by Octopus Energy{Colors.RESET}      ")
-            print(f"{Colors.CYAN}└──────────────────────────────────────────────────────────────{Colors.RESET}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}{' '*77}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.BLACK}[{progress_color}{bar}{Colors.BLACK}]{Colors.RESET} {progress_color}{progress:3d}%{Colors.RESET}{' '*46}")
+            print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╚{'═'*77}{Colors.RESET}")
+            print(f"{Colors.CYAN}│{Colors.RESET}{' '*99}")
+            print(f"{Colors.CYAN}│{Colors.RESET}  {Colors.BRIGHT_YELLOW}Free Electricity Sessions{Colors.RESET} {Colors.BLACK}Powered by Octopus Energy{Colors.RESET}{' '*47}")
+            print(f"{Colors.CYAN}└{'─'*99}{Colors.RESET}")
             
             sys.stdout.flush()
             
@@ -190,26 +190,30 @@ def display_static_banner():
     """
     Display a static banner (no animation) for environments where 
     cursor control might not work well (e.g., Docker logs).
+    Uses logging instead of print to ensure it appears in log files.
     """
-    print(f"{Colors.CYAN}┌──────────────────────────────────────────────────────────────{Colors.RESET}")
-    print(f"{Colors.CYAN}│{Colors.RESET}                                                              ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╔═══════════════════════════════════════{Colors.RESET}    ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BOLD}{Colors.BRIGHT_MAGENTA}OCTOFREE{Colors.RESET}                      ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}                                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}          ,'\"\"`.{Colors.RESET}                        ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}         / _  _ \\{Colors.RESET}                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}         |(@)(@)|{Colors.RESET}                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}         )  __  ({Colors.RESET}                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}        /,')))((`.\\{Colors.RESET}                    ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}       (( ((  )) )){Colors.RESET}                      ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}        `\\ `)(' /'{Colors.RESET}                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}                                       ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}            {Colors.BRIGHT_GREEN}Starting up...{Colors.RESET}              ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╚═══════════════════════════════════════{Colors.RESET}    ")
-    print(f"{Colors.CYAN}│{Colors.RESET}                                                              ")
-    print(f"{Colors.CYAN}│{Colors.RESET}  {Colors.BRIGHT_YELLOW}Free Electricity Sessions{Colors.RESET} {Colors.BLACK}Powered by Octopus Energy{Colors.RESET}      ")
-    print(f"{Colors.CYAN}└──────────────────────────────────────────────────────────────{Colors.RESET}")
-    print()
+    import logging
+    
+    # Log each line of the banner
+    logging.info(f"{Colors.CYAN}┌{'─'*99}{Colors.RESET}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}{' '*99}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╔{'═'*77}{Colors.RESET}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}              {Colors.BOLD}{Colors.BRIGHT_MAGENTA}OCTOFREE{Colors.RESET}{' '*65}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}             {Colors.BRIGHT_WHITE}LOADING...{Colors.RESET}{' '*64}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}{' '*77}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}          ,'\"\"`.{Colors.RESET}{' '*62}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}         / _  _ \\{Colors.RESET}{' '*61}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.BRIGHT_MAGENTA}         |(@)(@)|{Colors.RESET}{' '*61}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}         )  __  ({Colors.RESET}{' '*61}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}        /,')))((`.\\{Colors.RESET}{' '*58}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}       (( ((  )) )){Colors.RESET}{' '*60}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}  {Colors.MAGENTA}        `\\ `)(' /'{Colors.RESET}{' '*61}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}{' '*77}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}║{Colors.RESET}      {Colors.BRIGHT_GREEN}[████████████████████] 100%{Colors.RESET}{' '*46}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}                     {Colors.BRIGHT_CYAN}╚{'═'*77}{Colors.RESET}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}{' '*99}")
+    logging.info(f"{Colors.CYAN}│{Colors.RESET}  {Colors.BRIGHT_YELLOW}Free Electricity Sessions{Colors.RESET} {Colors.BLACK}Powered by Octopus Energy{Colors.RESET}{' '*47}")
+    logging.info(f"{Colors.CYAN}└{'─'*99}{Colors.RESET}")
 
 
 if __name__ == "__main__":
