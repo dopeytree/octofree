@@ -184,6 +184,8 @@ def main():
             # Check for sessions in stored data that no longer exist on website
             website_session_set = set(startup_current_sessions)
             orphaned_scheduled = []
+            sessions_moved_to_past = False
+            
             for session in startup_scheduled_sessions[:]:  # Copy to avoid modification during iteration
                 if session['session'] not in website_session_set:
                     # Check if session has already ended (past its end time)
@@ -192,6 +194,7 @@ def main():
                         # Session has ended, move to past
                         startup_past_sessions.append(session)
                         startup_scheduled_sessions.remove(session)
+                        sessions_moved_to_past = True
                         logging.info(f"✅ [STARTUP CLEANUP] Completed session '{session['session']}' → moved to past")
                     else:
                         # Session still exists but not on website - this is unusual, log it
@@ -206,6 +209,9 @@ def main():
                     logging.warning(f"  {prefix} {session}")
                 
                 for session_str in missing_from_tracking:
+                    # Check if this session exists in past_sessions (might have been moved there already)
+                    existing_in_past = next((s for s in startup_past_sessions if s['session'] == session_str), None)
+                    
                     # Parse and add the missing session
                     start_time = parse_session_date(session_str)
                     reminder_time = parse_session_to_reminder(session_str)
@@ -213,26 +219,45 @@ def main():
                     end_reminder_time = parse_session_to_end_reminder(session_str)
                     
                     if start_time and end_time:
-                        session_data = {
-                            'session': session_str,
-                            'start_time': start_time.isoformat(),
-                            'reminder_time': reminder_time.isoformat() if reminder_time else None,
-                            'end_time': end_time.isoformat(),
-                            'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None,
-                            'notified': False,  # Don't send notification on startup recovery
-                            'reminder_sent': False,
-                            'end_sent': False
-                        }
+                        # If session exists in past, preserve its notification flags
+                        if existing_in_past:
+                            session_data = {
+                                'session': session_str,
+                                'start_time': start_time.isoformat(),
+                                'reminder_time': reminder_time.isoformat() if reminder_time else None,
+                                'end_time': end_time.isoformat(),
+                                'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None,
+                                'notified': existing_in_past.get('notified', False),
+                                'reminder_sent': existing_in_past.get('reminder_sent', False),
+                                'end_sent': existing_in_past.get('end_sent', False)
+                            }
+                            logging.info(f"✅ [STARTUP RECOVERY] Recovered session (preserved flags from past): {session_str}")
+                        else:
+                            session_data = {
+                                'session': session_str,
+                                'start_time': start_time.isoformat(),
+                                'reminder_time': reminder_time.isoformat() if reminder_time else None,
+                                'end_time': end_time.isoformat(),
+                                'end_reminder_time': end_reminder_time.isoformat() if end_reminder_time else None,
+                                'notified': False,  # Don't send notification on startup recovery
+                                'reminder_sent': False,
+                                'end_sent': False
+                            }
+                            logging.info(f"✅ [STARTUP RECOVERY] Recovered missing session: {session_str}")
                         
                         startup_scheduled_sessions.append(session_data)
-                        logging.info(f"✅ [STARTUP RECOVERY] Recovered missing session: {session_str}")
                     else:
                         logging.error(f"❌ [STARTUP RECOVERY] Failed to parse times for recovered session: {session_str}")
                 
-                # Save updated sessions
+                # Save updated sessions only if recovery added sessions
                 save_scheduled_sessions(startup_scheduled_sessions)
                 save_past_scheduled_sessions(startup_past_sessions)
                 logging.info(f"✅ [STARTUP RECOVERY] Session recovery complete - added {len(missing_from_tracking)} session(s)")
+            elif sessions_moved_to_past:
+                # Save only if we moved sessions to past during cleanup
+                save_scheduled_sessions(startup_scheduled_sessions)
+                save_past_scheduled_sessions(startup_past_sessions)
+                logging.info(f"✅ [STARTUP CLEANUP] Saved changes after moving sessions to past")
             
             # Summary
             total_stored = len(startup_scheduled_sessions) + len(startup_past_sessions)
@@ -473,28 +498,167 @@ def main():
             # Check and send notifications (reminders, end states) - EVERY HOUR
             check_and_send_notifications()
             
-            # Show final status of upcoming alerts (moved to end for easy visibility)
+            # Show sent reminder notifications from last 48 hours
             logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            now = datetime.now()
+            cutoff_time = now - timedelta(hours=48)
+            
+            # Check current scheduled sessions for sent reminders
             final_scheduled_sessions = load_scheduled_sessions()
+            past_sessions = load_past_scheduled_sessions()
+            
+            sent_start_reminders = []
+            sent_end_reminders = []
+            
+            # Check scheduled sessions (might have sent reminders but session not ended yet)
+            for session in final_scheduled_sessions:
+                start_time = datetime.fromisoformat(session['start_time'])
+                if start_time >= cutoff_time:
+                    # Check if start reminder was sent
+                    if session.get('reminder_sent', False) and session.get('reminder_time'):
+                        reminder_dt = datetime.fromisoformat(session['reminder_time'])
+                        if reminder_dt >= cutoff_time:
+                            sent_start_reminders.append({
+                                'session': session['session'],
+                                'time': reminder_dt,
+                                'start_time': start_time
+                            })
+                    
+                    # Check if end reminder was sent
+                    if session.get('end_sent', False) and session.get('end_reminder_time'):
+                        end_reminder_dt = datetime.fromisoformat(session['end_reminder_time'])
+                        if end_reminder_dt >= cutoff_time:
+                            sent_end_reminders.append({
+                                'session': session['session'],
+                                'time': end_reminder_dt,
+                                'start_time': start_time
+                            })
+            
+            # Check past sessions for sent reminders
+            for session in past_sessions:
+                start_time = datetime.fromisoformat(session['start_time'])
+                if start_time >= cutoff_time:
+                    # Check if start reminder was sent
+                    if session.get('reminder_sent', False) and session.get('reminder_time'):
+                        reminder_dt = datetime.fromisoformat(session['reminder_time'])
+                        if reminder_dt >= cutoff_time:
+                            sent_start_reminders.append({
+                                'session': session['session'],
+                                'time': reminder_dt,
+                                'start_time': start_time
+                            })
+                    
+                    # Check if end reminder was sent
+                    if session.get('end_sent', False) and session.get('end_reminder_time'):
+                        end_reminder_dt = datetime.fromisoformat(session['end_reminder_time'])
+                        if end_reminder_dt >= cutoff_time:
+                            sent_end_reminders.append({
+                                'session': session['session'],
+                                'time': end_reminder_dt,
+                                'start_time': start_time
+                            })
+            
+            # Display sent reminders
+            total_sent = len(sent_start_reminders) + len(sent_end_reminders)
+            
+            if total_sent > 0:
+                logging.info(f"📨 SENT REMINDER NOTIFICATIONS (Last 48h): {total_sent} sent")
+                
+                # Show sent start reminders
+                if sent_start_reminders:
+                    # Sort by time (most recent first)
+                    sent_start_reminders.sort(key=lambda x: x['time'], reverse=True)
+                    logging.info(f"  📣 Start Reminders: {len(sent_start_reminders)}")
+                    for i, reminder in enumerate(sent_start_reminders[:3]):
+                        time_ago = (now - reminder['time']).total_seconds() / 3600  # hours
+                        ago_str = f"{int(time_ago)}h ago" if time_ago >= 1 else f"{int(time_ago * 60)}m ago"
+                        prefix = "    └─" if i == len(sent_start_reminders) - 1 and not sent_end_reminders else "    ├─"
+                        logging.info(f"{prefix} {reminder['session']} @ {reminder['time'].strftime('%I:%M%p')} ({ago_str})")
+                    if len(sent_start_reminders) > 3:
+                        logging.info(f"    ├─ ... and {len(sent_start_reminders) - 3} more")
+                
+                # Show sent end reminders
+                if sent_end_reminders:
+                    # Sort by time (most recent first)
+                    sent_end_reminders.sort(key=lambda x: x['time'], reverse=True)
+                    logging.info(f"  🏁 End Reminders: {len(sent_end_reminders)}")
+                    for i, reminder in enumerate(sent_end_reminders[:3]):
+                        time_ago = (now - reminder['time']).total_seconds() / 3600  # hours
+                        ago_str = f"{int(time_ago)}h ago" if time_ago >= 1 else f"{int(time_ago * 60)}m ago"
+                        prefix = "    └─" if i == len(sent_end_reminders) - 1 else "    ├─"
+                        logging.info(f"{prefix} {reminder['session']} @ {reminder['time'].strftime('%I:%M%p')} ({ago_str})")
+                    if len(sent_end_reminders) > 3:
+                        logging.info(f"    └─ ... and {len(sent_end_reminders) - 3} more")
+            else:
+                logging.info("🦉 No reminder notifications sent in last 48 hours")
+            
+            # Show upcoming reminder notifications
+            logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             if final_scheduled_sessions:
                 now = datetime.now()
-                upcoming_reminders = []
+                
+                # Collect both start and end reminders
+                upcoming_start_reminders = []
+                upcoming_end_reminders = []
+                
                 for session in final_scheduled_sessions:
+                    # Check start reminders
                     reminder_time = session.get('reminder_time')
                     if reminder_time and not session.get('reminder_sent', False):
                         reminder_dt = datetime.fromisoformat(reminder_time)
                         if reminder_dt > now:
-                            upcoming_reminders.append(f"{session['session']} ({reminder_dt.strftime('%m/%d %I:%M%p')})")
+                            time_until = (reminder_dt - now).total_seconds() / 60  # minutes
+                            upcoming_start_reminders.append({
+                                'session': session['session'],
+                                'time': reminder_dt,
+                                'minutes_until': time_until
+                            })
+                    
+                    # Check end reminders
+                    end_reminder_time = session.get('end_reminder_time')
+                    if end_reminder_time and not session.get('end_sent', False):
+                        end_reminder_dt = datetime.fromisoformat(end_reminder_time)
+                        if end_reminder_dt > now:
+                            time_until = (end_reminder_dt - now).total_seconds() / 60  # minutes
+                            upcoming_end_reminders.append({
+                                'session': session['session'],
+                                'time': end_reminder_dt,
+                                'minutes_until': time_until
+                            })
                 
-                if upcoming_reminders:
-                    logging.info(f"⏰ UPCOMING REMINDER ALERTS: {len(upcoming_reminders)} pending")
-                    for i, reminder in enumerate(upcoming_reminders[:3]):  # Show first 3
-                        prefix = "└─" if i == min(2, len(upcoming_reminders) - 1) else "├─"
-                        logging.info(f"  {prefix} {reminder}")
-                    if len(upcoming_reminders) > 3:
-                        logging.info(f"  └─ ... and {len(upcoming_reminders) - 3} more")
+                # Display upcoming reminders
+                total_reminders = len(upcoming_start_reminders) + len(upcoming_end_reminders)
+                
+                if total_reminders > 0:
+                    logging.info(f"⏰ UPCOMING REMINDER NOTIFICATIONS: {total_reminders} scheduled")
+                    
+                    # Show start reminders
+                    if upcoming_start_reminders:
+                        logging.info(f"  📣 Start Reminders (5 mins before): {len(upcoming_start_reminders)}")
+                        for i, reminder in enumerate(upcoming_start_reminders[:3]):
+                            hours_until = int(reminder['minutes_until'] // 60)
+                            mins_until = int(reminder['minutes_until'] % 60)
+                            time_str = f"{hours_until}h{mins_until}m" if hours_until > 0 else f"{mins_until}m"
+                            prefix = "    └─" if i == len(upcoming_start_reminders) - 1 and not upcoming_end_reminders else "    ├─"
+                            logging.info(f"{prefix} {reminder['session']} @ {reminder['time'].strftime('%I:%M%p')} (in {time_str})")
+                        if len(upcoming_start_reminders) > 3:
+                            logging.info(f"    ├─ ... and {len(upcoming_start_reminders) - 3} more")
+                    
+                    # Show end reminders
+                    if upcoming_end_reminders:
+                        logging.info(f"  🏁 End Reminders (5 mins before end): {len(upcoming_end_reminders)}")
+                        for i, reminder in enumerate(upcoming_end_reminders[:3]):
+                            hours_until = int(reminder['minutes_until'] // 60)
+                            mins_until = int(reminder['minutes_until'] % 60)
+                            time_str = f"{hours_until}h{mins_until}m" if hours_until > 0 else f"{mins_until}m"
+                            prefix = "    └─" if i == len(upcoming_end_reminders) - 1 else "    ├─"
+                            logging.info(f"{prefix} {reminder['session']} @ {reminder['time'].strftime('%I:%M%p')} (in {time_str})")
+                        if len(upcoming_end_reminders) > 3:
+                            logging.info(f"    └─ ... and {len(upcoming_end_reminders) - 3} more")
                 else:
-                    logging.info("✅ All scheduled session reminders have been sent")
+                    logging.info("✅ No pending reminder notifications (all sent or sessions in progress)")
+            else:
+                logging.info("📭 No scheduled sessions")
             
             # Always save current sessions as last extracted (after processing)
             logging.info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
