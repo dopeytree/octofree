@@ -101,8 +101,9 @@ def should_check_x():
     # Check if we're in the 11am window (11:00-11:59) or 8pm window (20:00-20:59)
     return hour == 11 or hour == 20
 
-# Global flag to control reminder thread
+# Global flag and event to control reminder thread
 reminder_thread_running = True
+reminder_stop_event = threading.Event()
 
 def reminder_checker_thread(check_interval=60):
     """
@@ -123,11 +124,12 @@ def reminder_checker_thread(check_interval=60):
         try:
             # Check and send any due reminder notifications
             check_and_send_notifications()
-        except Exception as e:
-            logging.error(f"❌ Error in reminder checker thread: {e}")
+        except Exception:
+            logging.exception("❌ Error in reminder checker thread")
         
-        # Sleep for the check interval
-        time.sleep(check_interval)
+        # Interruptible wait - allows immediate shutdown when stop event is set
+        if reminder_stop_event.wait(check_interval):
+            break
     
     logging.info("🔕 Reminder checker thread stopped")
 
@@ -136,6 +138,7 @@ def signal_handler(signum, frame):
     global reminder_thread_running
     logging.info(f"🛑 Received signal {signum}, shutting down gracefully...")
     reminder_thread_running = False
+    reminder_stop_event.set()  # Wake up the reminder thread immediately
     sys.exit(0)
 
 def main():
