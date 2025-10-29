@@ -14,7 +14,7 @@ echo "  [2] View logs (tail -f)"
 echo "  [3] Shell access"
 echo "  [q] Exit console"
 echo ""
-echo -n "Choose an option: "
+printf "Choose an option: "
 
 read choice
 

@@ -5,7 +5,7 @@ echo "🐙 Building Octofree Docker Image with TUI Monitor..."
 echo ""
 
 # Change to parent directory to include both octofree and bubbletea in build context
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 echo "Building from: $(pwd)"
 echo ""

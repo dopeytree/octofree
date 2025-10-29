@@ -14,7 +14,7 @@ A beautiful terminal-based monitoring interface for the Octofree application bui
 
 ## Interface
 
-The interface has three main tabs:
+The interface has five tabs:
 
 1. **Overview** (Press `1`)
    - Quick statistics dashboard
@@ -32,6 +32,16 @@ The interface has three main tabs:
    - Notification tracking
    - Reminder delivery status
 
+4. **Logs** (Press `4`)
+   - Live log viewer with scrolling (↑/↓ or j/k)
+   - Jump to top/bottom with g/G
+   - Real-time scraper activity monitoring
+
+5. **README** (Press `5`)
+   - Rendered markdown viewer
+   - Switch between README files with ←/→ or h/l
+   - Scroll with ↑/↓ or j/k
+
 ## Running the Application
 
 1. Ensure Go is installed (version 1.21 or later)
@@ -41,14 +51,18 @@ The interface has three main tabs:
 
 ## Keyboard Controls
 
-- `1`, `2`, `3` - Switch to specific tab
+- `1`..`5` - Switch to specific tab
 - `TAB` - Cycle through tabs
+- `↑/↓` or `j/k` - Scroll in Logs/README tabs
+- `g/G` - Jump to top/bottom in Logs/README tabs
+- `←/→` or `h/l` - Switch README files in README tab
 - `r` - Refresh data from octofree output files
 - `q` or `Ctrl+C` - Quit application
 
 ## Data Source
 
 The monitor reads data from the `../octofree/output/` directory:
+
 - `scheduled_sessions.json` - Upcoming sessions
 - `past_scheduled_sessions.json` - Completed sessions
 - `last_extracted_sessions.json` - Most recent scrape results
@@ -58,4 +72,5 @@ The monitor reads data from the `../octofree/output/` directory:
 
 - [Bubbletea](https://github.com/charmbracelet/bubbletea) v0.25.0 - TUI framework
 - [Bubbles](https://github.com/charmbracelet/bubbles) v0.18.0 - TUI components (tables)
-- [Lipgloss](https://github.com/charmbracelet/lipgloss) v0.9.1 - Terminal styling
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) v1.1.1 - Terminal styling
+- [Glamour](https://github.com/charmbracelet/glamour) v0.10.0 - Markdown rendering

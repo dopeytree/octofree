@@ -4,11 +4,11 @@ FROM golang:1.23-alpine AS go-builder
 WORKDIR /build
 
 # Copy Go module files
-COPY ../bubbletea/go.mod ../bubbletea/go.sum ./
+COPY bubbletea/go.mod bubbletea/go.sum ./
 RUN go mod download
 
 # Copy Go source
-COPY ../bubbletea/ ./
+COPY bubbletea/ ./
 RUN go build -o octofree-monitor .
 
 # Stage 2: Final Python runtime image

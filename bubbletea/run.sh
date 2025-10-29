@@ -2,7 +2,7 @@
 # Octofree Monitor Launcher
 # Quick script to build and run the Bubbletea TUI monitor
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")" || exit 1
 
 echo "🔨 Building Octofree Monitor..."
 go build -o octofree-monitor main.go

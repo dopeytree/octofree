@@ -92,9 +92,11 @@ For support, visit the forum: https://forums.unraid.net/topic/194221-support-dop
 2. **User interacts with TUI** - Browse tabs, view data, etc.
 3. **User presses 'q'** - Exits TUI
 4. **Prompt appears:**
-   ```
+
+   ```text
    TUI closed. Press Enter for shell, or Ctrl+C to exit...
    ```
+
 5. **User presses Enter** - Gets shell access (`/bin/sh`)
 6. **User types 'exit'** - Loop restarts, TUI launches again!
 7. **User presses Ctrl+C** - Exits console completely
