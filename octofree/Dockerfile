@@ -1,5 +1,5 @@
 # Stage 1: Build Go TUI
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.24-alpine AS go-builder
 
 WORKDIR /build
 
@@ -27,7 +27,7 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY octofree/requirements.txt .
 
 # Upgrade pip and install dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
@@ -35,15 +35,29 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     rm -rf /root/.cache/pip
 
 # Copy Python application
-COPY . .
+COPY octofree/ .
+
+# Copy README files for TUI
+COPY README.md /app/README.md
 
 # Copy Go TUI binary from builder stage
 COPY --from=go-builder /build/octofree-monitor /usr/local/bin/octofree-monitor
 RUN chmod +x /usr/local/bin/octofree-monitor
 
 # Copy and setup console script
-COPY docker-console.sh /usr/local/bin/docker-console
+COPY octofree/docker-console.sh /usr/local/bin/docker-console
 RUN chmod +x /usr/local/bin/docker-console
+
+# Create console wrapper that auto-launches TUI
+RUN echo '#!/bin/sh' > /usr/local/bin/console-wrapper && \
+    echo 'while true; do' >> /usr/local/bin/console-wrapper && \
+    echo '  /usr/local/bin/octofree-monitor' >> /usr/local/bin/console-wrapper && \
+    echo '  echo ""' >> /usr/local/bin/console-wrapper && \
+    echo '  echo "TUI closed. Press Enter for shell, or Ctrl+C to exit..."' >> /usr/local/bin/console-wrapper && \
+    echo '  read response' >> /usr/local/bin/console-wrapper && \
+    echo '  /bin/sh' >> /usr/local/bin/console-wrapper && \
+    echo 'done' >> /usr/local/bin/console-wrapper && \
+    chmod +x /usr/local/bin/console-wrapper
 
 # Set up configuration from template if no settings.env exists
 RUN if [ ! -f settings.env ]; then cp settings.env.template settings.env; fi
