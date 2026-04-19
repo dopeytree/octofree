@@ -65,7 +65,8 @@ def extract_sessions(html_content):
     sessions = []
     session_type = None
     # Try to find "Next Sessions:" first (for multiple)
-    match = re.search(r'Next\s+Sessions?:', html_content, re.IGNORECASE)
+    # Octopus pages vary between "Next Sessions:" and "Next Free Electricity sessions:"
+    match = re.search(r'Next\s+(?:Free\s+Electricity\s+)?Sessions?:', html_content, re.IGNORECASE)
     if match:
         session_type = 'next'
         start_pos = match.end()
@@ -86,8 +87,8 @@ def extract_sessions(html_content):
                 found = re.findall(r'\d+(?:am|pm)?-\d+(?:am|pm)?,\s*\w+\s*\d+(?:st|nd|rd|th)?\s*\w+', part, re.IGNORECASE)
                 sessions.extend(found)
     else:
-        # Check for "Last Session:"
-        match = re.search(r'Last\s+Session:', html_content, re.IGNORECASE)
+        # Check for "Last Session:" or "Last Free Electricity sessions:"
+        match = re.search(r'Last\s+(?:Free\s+Electricity\s+)?Sessions?:', html_content, re.IGNORECASE)
         if match:
             session_type = 'last'
             start_pos = match.end()

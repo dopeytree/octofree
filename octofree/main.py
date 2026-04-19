@@ -722,8 +722,10 @@ def main():
             save_last_extracted_sessions(current_sessions)
             logging.debug(f"💾 [STORAGE] Updated last_extracted_sessions.json with {len(current_sessions)} session(s)")
         
-        else:
+        elif html_content is None:
             logging.error("Failed to fetch HTML content.")
+        else:
+            logging.info("ℹ️  No sessions extracted from HTML (page may have no sessions listed yet)")
         
         if single_run:
             break
